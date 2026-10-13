@@ -1,0 +1,13 @@
+# Sources, builds and runtime state (recreated by the scripts)
+downloads/
+src/
+build/
+deps/
+dist/
+dist-verified*/
+toolchains/
+prefixes/
+logs/
+shots/
+tools/*.exe
+*.dxvk-cache

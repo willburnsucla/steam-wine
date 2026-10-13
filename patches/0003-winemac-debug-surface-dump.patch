@@ -1,0 +1,80 @@
+--- a/dlls/winemac.drv/surface.c
++++ b/dlls/winemac.drv/surface.c
+@@ -26,6 +26,11 @@
+ 
+ #include "config.h"
+ 
++#include <stdio.h>
++#include <stdlib.h>
++#include <time.h>
++#include <unistd.h>
++
+ #include "macdrv.h"
+ #include "winuser.h"
+ 
+@@ -74,6 +79,56 @@
+ {
+ }
+ 
++/* Debug aid: with WINE_MACDRV_DUMP_DIR set, save what each window surface hands to Cocoa as
++ * <dir>/<hwnd>.bmp (at most once a second per window) and log its alpha settings to
++ * <dir>/surfaces.log. Shows whether pixels reach the driver when the screen can't be captured. */
++static void dump_surface(struct window_surface *window_surface, const BITMAPINFO *color_info,
++                         const void *color_bits)
++{
++    static const char *dir;
++    static int checked;
++    static struct { HWND hwnd; time_t when; } last[32];
++    char path[1024];
++    BITMAPFILEHEADER bf;
++    FILE *f;
++    time_t now = time(NULL);
++    int i, slot = -1;
++
++    if (!checked) { dir = getenv("WINE_MACDRV_DUMP_DIR"); checked = 1; }
++    if (!dir || !*dir || color_info->bmiHeader.biBitCount != 32) return;
++
++    for (i = 0; i < ARRAY_SIZE(last); i++)
++    {
++        if (last[i].hwnd == window_surface->hwnd) { slot = i; break; }
++        if (slot < 0 && !last[i].hwnd) slot = i;
++    }
++    if (slot < 0) slot = (UINT_PTR)window_surface->hwnd % ARRAY_SIZE(last);
++    if (last[slot].hwnd == window_surface->hwnd && now - last[slot].when < 1) return;
++    last[slot].hwnd = window_surface->hwnd;
++    last[slot].when = now;
++
++    snprintf(path, sizeof(path), "%s/%p.bmp", dir, window_surface->hwnd);
++    if (!(f = fopen(path, "wb"))) return;
++    memset(&bf, 0, sizeof(bf));
++    bf.bfType = 0x4d42;
++    bf.bfOffBits = sizeof(bf) + sizeof(BITMAPINFOHEADER);
++    bf.bfSize = bf.bfOffBits + color_info->bmiHeader.biSizeImage;
++    fwrite(&bf, sizeof(bf), 1, f);
++    fwrite(&color_info->bmiHeader, sizeof(BITMAPINFOHEADER), 1, f);
++    fwrite(color_bits, 1, color_info->bmiHeader.biSizeImage, f);
++    fclose(f);
++
++    snprintf(path, sizeof(path), "%s/surfaces.log", dir);
++    if ((f = fopen(path, "a")))
++    {
++        fprintf(f, "%ld pid %d hwnd %p %dx%d alpha_mask %#x alpha_bits %#x color_key %#x\n",
++                (long)now, (int)getpid(), window_surface->hwnd, (int)color_info->bmiHeader.biWidth,
++                abs((int)color_info->bmiHeader.biHeight), window_surface->alpha_mask,
++                window_surface->alpha_bits, (unsigned int)window_surface->color_key);
++        fclose(f);
++    }
++}
++
+ /***********************************************************************
+  *              macdrv_surface_flush
+  */
+@@ -86,6 +141,8 @@
+     CGColorSpaceRef colorspace;
+     CGImageRef image;
+ 
++    dump_surface(window_surface, color_info, color_bits);
++
+     colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+     image = CGImageCreate(color_info->bmiHeader.biWidth, abs(color_info->bmiHeader.biHeight), 8, 32,
+                           color_info->bmiHeader.biSizeImage / abs(color_info->bmiHeader.biHeight), colorspace,

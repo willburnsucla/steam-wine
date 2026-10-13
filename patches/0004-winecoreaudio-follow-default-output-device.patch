@@ -1,0 +1,69 @@
+--- a/dlls/winecoreaudio.drv/coreaudio.c
++++ b/dlls/winecoreaudio.drv/coreaudio.c
+@@ -571,7 +571,25 @@
+     return noErr;
+ }
+ 
+-static AudioComponentInstance get_audiounit(EDataFlow dataflow, AudioDeviceID adevid)
++/* Should a render stream on adevid follow the system default output? True when adevid is the
++ * current default (the app asked for the default endpoint) unless WINE_COREAUDIO_FOLLOW_DEFAULT=0.
++ * Then we use Apple's DefaultOutput unit, which moves to whatever device the user selects in
++ * macOS (e.g. Bluetooth headphones connected mid-game) instead of staying on the old one. */
++static BOOL follow_default_output(EDataFlow dataflow, AudioDeviceID adevid)
++{
++    AudioObjectPropertyAddress addr = {kAudioHardwarePropertyDefaultOutputDevice,
++                                       kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
++    const char *env = getenv("WINE_COREAUDIO_FOLLOW_DEFAULT");
++    AudioDeviceID def;
++    UInt32 size = sizeof(def);
++
++    if(dataflow != eRender || (env && *env == '0')) return FALSE;
++    if(AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL, &size, &def) != noErr)
++        return FALSE;
++    return def == adevid;
++}
++
++static AudioComponentInstance get_audiounit(EDataFlow dataflow, AudioDeviceID adevid, BOOL follow_default)
+ {
+     AudioComponentInstance unit;
+     AudioComponent comp;
+@@ -580,7 +598,7 @@
+ 
+     memset(&desc, 0, sizeof(desc));
+     desc.componentType = kAudioUnitType_Output;
+-    desc.componentSubType = kAudioUnitSubType_HALOutput;
++    desc.componentSubType = follow_default ? kAudioUnitSubType_DefaultOutput : kAudioUnitSubType_HALOutput;
+     desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+ 
+     if(!(comp = AudioComponentFindNext(NULL, &desc))){
+@@ -616,6 +634,11 @@
+         }
+     }
+ 
++    if(follow_default){
++        TRACE("render stream follows the default output device (currently %u)\n", (unsigned int)adevid);
++        return unit;
++    }
++
+     sc = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+             kAudioUnitScope_Global, 0, &adevid, sizeof(adevid));
+     if(sc != noErr){
+@@ -841,7 +864,8 @@
+     if(params->share == AUDCLNT_SHAREMODE_EXCLUSIVE)
+         stream->bufsize_frames -= stream->bufsize_frames % stream->period_frames;
+ 
+-    if(!(stream->unit = get_audiounit(stream->flow, stream->dev_id))){
++    if(!(stream->unit = get_audiounit(stream->flow, stream->dev_id,
++                                      follow_default_output(stream->flow, stream->dev_id)))){
+         params->result = AUDCLNT_E_DEVICE_INVALIDATED;
+         goto end;
+     }
+@@ -1226,7 +1250,7 @@
+     AudioComponentInstance unit;
+     const AudioDeviceID dev_id = dev_id_from_device(params->device);
+ 
+-    unit = get_audiounit(params->flow, dev_id);
++    unit = get_audiounit(params->flow, dev_id, FALSE);
+ 
+     converter = NULL;
+     params->result = ca_setup_audiounit(params->flow, unit, params->fmt_in, &dev_desc, &converter, NULL);

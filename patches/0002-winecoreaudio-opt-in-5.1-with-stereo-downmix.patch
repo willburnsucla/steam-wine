@@ -1,0 +1,188 @@
+--- a/dlls/winecoreaudio.drv/coreaudio.c
++++ b/dlls/winecoreaudio.drv/coreaudio.c
+@@ -102,6 +102,7 @@
+     INT32 getbuf_last;
+     WAVEFORMATEX *fmt;
+     BYTE *local_buffer, *cap_buffer, *wrap_buffer, *resamp_buffer, *tmp_buffer;
++    BOOL downmix_5_1; /* fmt is 5.1, the audio unit is stereo; ca_render_cb mixes down */
+ };
+ 
+ static const REFERENCE_TIME def_period = 100000;
+@@ -390,6 +391,59 @@
+         memset(buffer, 0, frames * stream->fmt->nBlockAlign);
+ }
+ 
++static BOOL force_5_1(void)
++{
++    const char *force = getenv("WINE_COREAUDIO_FORCE_5_1");
++    return force && *force && *force != '0';
++}
++
++/* 5.1 (FL FR FC LFE BL BR or FL FR FC LFE SL SR) in 32-bit float or 16-bit PCM? */
++static BOOL is_downmixable_5_1(const WAVEFORMATEX *fmt)
++{
++    const WAVEFORMATEXTENSIBLE *fmtex = (const WAVEFORMATEXTENSIBLE *)fmt;
++    BOOL is_float, is_pcm;
++
++    if(fmt->nChannels != 6) return FALSE;
++    if(fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE){
++        if(fmtex->dwChannelMask != KSAUDIO_SPEAKER_5POINT1 &&
++           fmtex->dwChannelMask != KSAUDIO_SPEAKER_5POINT1_SURROUND) return FALSE;
++        is_float = IsEqualGUID(&fmtex->SubFormat, &KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
++        is_pcm = IsEqualGUID(&fmtex->SubFormat, &KSDATAFORMAT_SUBTYPE_PCM);
++    }else{
++        is_float = fmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT;
++        is_pcm = fmt->wFormatTag == WAVE_FORMAT_PCM;
++    }
++    return (is_float && fmt->wBitsPerSample == 32) || (is_pcm && fmt->wBitsPerSample == 16);
++}
++
++/* Mix 5.1 down to stereo: L = FL + c*FC + c*BL, R = FR + c*FC + c*BR, c = 1/sqrt(2).
++ * LFE is dropped. Results are clipped to the format's range. */
++static void downmix_5_1_to_stereo(const WAVEFORMATEX *fmt, const BYTE *src, BYTE *dst, UINT32 frames)
++{
++    static const float c = 0.70710678f;
++    BOOL is_float = fmt->wBitsPerSample == 32;
++    UINT32 i;
++
++    for(i = 0; i < frames; i++){
++        float in[6], l, r;
++        int ch;
++
++        for(ch = 0; ch < 6; ch++)
++            in[ch] = is_float ? ((const float *)src)[i * 6 + ch] : ((const INT16 *)src)[i * 6 + ch] / 32768.0f;
++        l = in[0] + c * in[2] + c * in[4];
++        r = in[1] + c * in[2] + c * in[5];
++        l = l > 1.0f ? 1.0f : (l < -1.0f ? -1.0f : l);
++        r = r > 1.0f ? 1.0f : (r < -1.0f ? -1.0f : r);
++        if(is_float){
++            ((float *)dst)[i * 2] = l;
++            ((float *)dst)[i * 2 + 1] = r;
++        }else{
++            ((INT16 *)dst)[i * 2] = (INT16)(l * 32767.0f);
++            ((INT16 *)dst)[i * 2 + 1] = (INT16)(r * 32767.0f);
++        }
++    }
++}
++
+ /* CA is pulling data from us */
+ static OSStatus ca_render_cb(void *user, AudioUnitRenderActionFlags *flags,
+         const AudioTimeStamp *ts, UInt32 bus, UInt32 nframes,
+@@ -407,7 +461,19 @@
+ 
+         chunk_bytes = (stream->bufsize_frames - stream->lcl_offs_frames) * stream->fmt->nBlockAlign;
+ 
+-        if(to_copy_bytes > chunk_bytes){
++        if(stream->downmix_5_1){
++            UINT32 chunk_frames = stream->bufsize_frames - stream->lcl_offs_frames;
++            UINT32 out_align = stream->fmt->wBitsPerSample / 8 * 2;
++            BYTE *out = data->mBuffers[0].mData;
++
++            if(to_copy_frames > chunk_frames){
++                downmix_5_1_to_stereo(stream->fmt, stream->local_buffer + lcl_offs_bytes, out, chunk_frames);
++                downmix_5_1_to_stereo(stream->fmt, stream->local_buffer, out + chunk_frames * out_align,
++                                      to_copy_frames - chunk_frames);
++            }else
++                downmix_5_1_to_stereo(stream->fmt, stream->local_buffer + lcl_offs_bytes, out, to_copy_frames);
++            to_copy_bytes = to_copy_frames * out_align; /* output-side bytes, for the silence fill below */
++        }else if(to_copy_bytes > chunk_bytes){
+             memcpy(data->mBuffers[0].mData, stream->local_buffer + lcl_offs_bytes, chunk_bytes);
+             memcpy(((BYTE *)data->mBuffers[0].mData) + chunk_bytes, stream->local_buffer, to_copy_bytes - chunk_bytes);
+         }else
+@@ -419,8 +485,13 @@
+     }else
+         to_copy_bytes = to_copy_frames = 0;
+ 
+-    if(nframes > to_copy_frames)
+-        silence_buffer(stream, ((BYTE *)data->mBuffers[0].mData) + to_copy_bytes, nframes - to_copy_frames);
++    if(nframes > to_copy_frames){
++        if(stream->downmix_5_1) /* float and 16-bit PCM silence are both zero */
++            memset(((BYTE *)data->mBuffers[0].mData) + to_copy_bytes, 0,
++                   (nframes - to_copy_frames) * (stream->fmt->wBitsPerSample / 8 * 2));
++        else
++            silence_buffer(stream, ((BYTE *)data->mBuffers[0].mData) + to_copy_bytes, nframes - to_copy_frames);
++    }
+ 
+     os_unfair_lock_unlock(&stream->lock);
+ 
+@@ -608,7 +679,7 @@
+ 
+ static HRESULT ca_setup_audiounit(EDataFlow dataflow, AudioComponentInstance unit,
+                                   const WAVEFORMATEX *fmt, AudioStreamBasicDescription *dev_desc,
+-                                  AudioConverterRef *converter)
++                                  AudioConverterRef *converter, BOOL *downmix_5_1)
+ {
+     OSStatus sc;
+     HRESULT hr;
+@@ -665,11 +736,28 @@
+         }
+     }else{
+         AudioChannelLayout layout;
++        BOOL downmix = FALSE;
+ 
+         hr = ca_get_audiodesc(dev_desc, fmt);
+         if(FAILED(hr))
+             return hr;
+ 
++        /* Forced 5.1 on a stereo (or mono) device: CoreAudio only maps channels between
++         * layouts, it doesn't mix, so the center channel would be dropped. Give the unit a
++         * stereo stream and downmix in ca_render_cb instead. */
++        if(force_5_1() && is_downmixable_5_1(fmt)){
++            AudioStreamBasicDescription hw;
++            UInt32 size = sizeof(hw);
++            if(AudioUnitGetProperty(unit, kAudioUnitProperty_StreamFormat,
++                                    kAudioUnitScope_Output, 0, &hw, &size) == noErr &&
++               hw.mChannelsPerFrame <= 2){
++                downmix = TRUE;
++                dev_desc->mChannelsPerFrame = 2;
++                dev_desc->mBytesPerFrame = dev_desc->mBytesPerPacket = fmt->wBitsPerSample / 8 * 2;
++            }
++        }
++        if(downmix_5_1) *downmix_5_1 = downmix;
++
+         dump_adesc("final", dev_desc);
+         sc = AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat,
+                                   kAudioUnitScope_Input, 0, dev_desc, sizeof(*dev_desc));
+@@ -680,7 +768,7 @@
+ 
+         /* Set channel layout: AudioChannelBitmap and dwChannelMask conveniently have identical positions */
+         layout.mChannelLayoutTag = kAudioChannelLayoutTag_UseChannelBitmap;
+-        layout.mChannelBitmap    = (fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE) ? ((WAVEFORMATEXTENSIBLE *)fmt)->dwChannelMask : 0x3;
++        layout.mChannelBitmap    = (fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE && !downmix) ? ((WAVEFORMATEXTENSIBLE *)fmt)->dwChannelMask : 0x3;
+         layout.mNumberChannelDescriptions = 0;
+ 
+         sc = AudioUnitSetProperty(unit, kAudioUnitProperty_AudioChannelLayout,
+@@ -758,7 +846,8 @@
+         goto end;
+     }
+ 
+-    params->result = ca_setup_audiounit(stream->flow, stream->unit, stream->fmt, &stream->dev_desc, &stream->converter);
++    params->result = ca_setup_audiounit(stream->flow, stream->unit, stream->fmt, &stream->dev_desc, &stream->converter,
++                                        &stream->downmix_5_1);
+     if(FAILED(params->result)) goto end;
+ 
+     input.inputProcRefCon = stream;
+@@ -1097,6 +1186,14 @@
+         params->fmt->dwChannelMask = get_channel_mask(params->fmt->Format.nChannels);
+     }
+ 
++    /* Opt-in: report 5.1 for stereo-or-smaller render devices. Some games (e.g. LEGO Star Wars:
++     * The Skywalker Saga) put dialog on the center channel and lose it when the mix format is
++     * stereo. ca_setup_audiounit/ca_render_cb then mix 5.1 down to stereo for the device. */
++    if(params->flow == eRender && params->fmt->Format.nChannels <= 2 && force_5_1()){
++        params->fmt->Format.nChannels = 6;
++        params->fmt->dwChannelMask = KSAUDIO_SPEAKER_5POINT1;
++    }
++
+     addr.mSelector = kAudioDevicePropertyNominalSampleRate;
+     size = sizeof(Float64);
+     sc = AudioObjectGetPropertyData(dev_id, &addr, 0, NULL, &size, &rate);
+@@ -1132,7 +1229,7 @@
+     unit = get_audiounit(params->flow, dev_id);
+ 
+     converter = NULL;
+-    params->result = ca_setup_audiounit(params->flow, unit, params->fmt_in, &dev_desc, &converter);
++    params->result = ca_setup_audiounit(params->flow, unit, params->fmt_in, &dev_desc, &converter, NULL);
+     AudioComponentInstanceDispose(unit);
+     if(converter) AudioConverterDispose(converter);
+ 

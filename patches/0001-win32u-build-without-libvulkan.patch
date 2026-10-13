@@ -1,0 +1,18 @@
+--- a/dlls/win32u/vulkan.c
++++ b/dlls/win32u/vulkan.c
+@@ -3006,10 +3006,15 @@
+     if (!(libvulkan = getenv( "CX_LIBVULKAN" )) ||
+         !(graphics_backend = getenv( "CX_ACTIVE_GRAPHICS_BACKEND" )) ||
+         strcmp( graphics_backend, "wined3d" ))
++#ifdef SONAME_LIBVULKAN
+         libvulkan = SONAME_LIBVULKAN;
++#else
++        libvulkan = NULL;
++#endif
+     else
+         ERR( "Using %s\n", libvulkan );
+ 
++    if (!libvulkan) return;
+     if (!(vulkan_handle = dlopen( libvulkan, RTLD_NOW )))
+     {
+         ERR( "Failed to load %s: %s\n", libvulkan, dlerror() );
