@@ -11,8 +11,8 @@ While CrossOver is good software, it costs $74 per Mac, and every free option I 
 - Direct3D 12 through DXMT's experimental D3D12 support; a test program renders and presents correctly, but don't expect demanding DX12 games to run yet.
 - Vulkan through MoltenVK.
 - Game controllers (Xbox, PlayStation, Switch Pro; USB or Bluetooth) through SDL2. Wine's controller layer is verified to start with SDL; a physical controller hasn't been tested yet. `tools/padtest.exe` lists the controllers games can see.
-- 4 GB of address space for 32-bit games, without patching their executables (Fallout 3 and New Vegas otherwise run out at 2 GB).
-- Media playback through GStreamer (DirectShow and Media Foundation), so older games' MP3 music plays; Fallout 3, New Vegas and Oblivion use it.
+- 4 GB of address space for 32-bit games, without patching their executables (Fallout 3 and New Vegas otherwise run out at 2 GB). It applies to every 32-bit program Steam starts; if an old 32-bit game misbehaves, `WINE_LARGE_ADDRESS_AWARE=0 scripts/steam.sh` turns it off for the session.
+- MP3 and WAV audio through GStreamer, so older games' DirectShow music plays (Fallout 3, New Vegas and Oblivion play music this way; not yet tested in those games). Media Foundation goes through the same plugins but is untested, and no video decoders are built.
 - Retina rendering at 2x.
 - Game audio offered as 5.1 and mixed down to stereo, so center-channel dialog isn't lost; audio follows the macOS output device (headphones connected mid-game get the sound).
 
@@ -38,14 +38,14 @@ scripts/build-all.sh
 scripts/install-steam.sh
 ```
 
-`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, GStreamer, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `scripts/run-tests.sh` builds small test programs and checks each piece (DirectX 9/11/12, Vulkan, audio, MP3 playback); `--steam` adds a check that Steam's sign-in window is drawn. `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and sets Retina scaling.
+`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, GStreamer, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `scripts/run-tests.sh` builds small test programs and checks each piece (DirectX 9/11/12, Vulkan, audio, MP3 playback, 4 GB for 32-bit games, the controller layer); `--steam` also runs some of them with Steam's own environment and checks that Steam's sign-in window is drawn. `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and sets Retina scaling.
 
 ## Play
 
 Double-click `Steam (Wine).command`, or run `scripts/steam.sh`. Sign in, install a game, play. Steam updates itself on the first launch (about 250 MB), and a game's first run is slow while shaders compile.
 
 - `scripts/steam.sh --stop` quits Steam and everything Wine started.
-- `scripts/steam.sh --exec <program>` runs a Windows program (an installer, a mod manager) inside Steam's environment with the same settings.
+- `scripts/steam.sh --exec <program>` runs a Windows program (an installer, a mod manager) inside Steam's environment with the same settings. Start Steam first if the program launches a game, so the game's Steam session gets Steam's fixes.
 - `scripts/game-graphics.sh <path to the game's exe> dxvk` switches one game to DXVK; `dxmt` switches it back.
 - `WINE_COREAUDIO_FORCE_5_1=0 scripts/steam.sh` turns off the 5.1 downmix, and `WINE_COREAUDIO_FOLLOW_DEFAULT=0` keeps game audio on the device that was selected when the game started.
 

@@ -8,13 +8,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$ROOT/downloads" "$ROOT/src"
 
-fetch() { # url file sha256
-    local out="$ROOT/downloads/$2"
+fetch() { # url file sha256 [dir]   (dir defaults to downloads/)
+    local out="${4:-$ROOT/downloads}/$2"
+    mkdir -p "$(dirname "$out")"
     [ -f "$out" ] || curl -fL --retry 3 -o "$out" "$1"
     echo "$3  $out" | shasum -a 256 -c -
 }
 
-clone() { # url dir ref
+clone() { # url dir ref   (dir relative to src/)
     local dir="$ROOT/src/$2"
     if [ ! -d "$dir/.git" ]; then
         git init -q "$dir"
@@ -34,6 +35,17 @@ fetch https://www.mpg123.de/download/mpg123-1.33.7.tar.bz2 \
 fetch https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10.tar.gz \
     SDL2-2.32.10.tar.gz 5f5993c530f084535c65a6879e9b26ad441169b3e25d789d83287040a9ca5165
 [ -d "$ROOT/src/sources/wine" ] || tar -xzf "$ROOT/downloads/crossover-sources-26.3.0.tar.gz" -C "$ROOT/src"
+
+# GLib's subprojects, pinned (its wraps would otherwise download at build time, and libffi's
+# points at a moving branch). The tarball ships gvdb as an empty submodule folder; clone fills it.
+G=sources/glib/subprojects
+clone https://gitlab.freedesktop.org/gstreamer/meson-ports/libffi.git $G/libffi 83d0cfd00d7d37af4b4349511d29f1f0512621b3
+clone https://github.com/frida/proxy-libintl.git $G/proxy-libintl c03e1a74b17fa7ec467e110130775409e4828a4c
+clone https://gitlab.gnome.org/GNOME/gvdb.git $G/gvdb 0854af0fdb6d527a8d1999835ac2c5059976c210
+fetch https://github.com/PhilipHazel/pcre2/releases/download/pcre2-10.42/pcre2-10.42.tar.bz2 \
+    pcre2-10.42.tar.bz2 8d36cd8cb6ea2a4c2bb358ff6411b0c788633a2a45dabbf1aeb4b701d1b5e840 "$ROOT/src/$G/packagecache"
+fetch https://wrapdb.mesonbuild.com/v2/pcre2_10.42-2/get_patch \
+    pcre2_10.42-2_patch.zip 350dc342b81a1611af43e5cc23f1b10453c7df51d5bb60ab9ee247daf03802bc "$ROOT/src/$G/packagecache"
 
 clone https://github.com/3Shain/dxmt.git dxmt 9839e55f98d4aca103957ee4132d6395a325a9ed
 git -C "$ROOT/src/dxmt" submodule update -q --init --depth 1

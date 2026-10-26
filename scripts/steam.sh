@@ -13,7 +13,9 @@
 #    patching their exes. WINE_LARGE_ADDRESS_AWARE=0 turns it off.
 # Usage: scripts/steam.sh [extra steam args]   (Ctrl-C or `scripts/steam.sh --stop` to quit)
 #        scripts/steam.sh --exec <program> [args]   run a program in Steam's prefix with Steam's
-#            environment (installers, mod managers, tests); EXEC_TIME_LIMIT=<s> adds a limit
+#            environment (installers, mod managers, tests). Start Steam first if the program
+#            launches a game. EXEC_TIME_LIMIT=<seconds> is for tests: when it's hit, everything
+#            Wine started (Steam included) is stopped.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/scripts/runtime-env.sh"
@@ -32,6 +34,10 @@ fi
 
 if [ "${1:-}" = "--exec" ]; then
     shift
+    [ $# -gt 0 ] || { echo "usage: steam.sh --exec <program> [args]" >&2; exit 2; }
+    case "${EXEC_TIME_LIMIT:-}" in
+        *[!0-9]*) echo "EXEC_TIME_LIMIT must be a number of seconds" >&2; exit 2 ;;
+    esac
     if [ -n "${EXEC_TIME_LIMIT:-}" ]; then
         exec "$ROOT/scripts/wine-run.sh" "$EXEC_TIME_LIMIT" "$@"
     fi

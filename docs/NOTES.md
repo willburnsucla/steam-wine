@@ -52,6 +52,12 @@ CrossOver's Steam profile adds fonts, the VC++ runtime, `d3dcompiler_47` and msy
 - GLib needed three fixes: the tarball ships `subprojects/gvdb` as an empty submodule folder (removed so meson uses the wrap), its D-Bus code generator imports `distutils`, gone since Python 3.12 (`patches/glib/0001`), and 2.78 uses older option names (`man`, `gtk_doc`, no `introspection`). GStreamer is told `-Dbuild-tools-source=system`, otherwise it fetches its own bison and pcre2 on macOS.
 - `scripts/runtime-env.sh` points GStreamer at our plugins only and keeps its registry in `prefixes/gst-registry.bin`, so another GStreamer on the Mac never mixes in. The first media playback after a rebuild takes a few extra seconds while the registry is built.
 
+## 32-bit address space
+
+- `WINE_LARGE_ADDRESS_AWARE=1` (set by `steam.sh`) makes Wine give 32-bit programs without the large-address-aware flag 4 GB instead of 2 GB under WoW64; 64-bit programs are unaffected. `tools/memtest.c` (built with `--disable-large-address-aware`, and refusing to run if it's flagged anyway) reserves 1920 MB without it and 3968 MB with it, and writes to a page above 2 GB.
+- The variable is checked before the per-program registry setting (`HKCU\Software\Wine\AppDefaults\<exe>\LargeAddressAware`), so while it's set no single game can opt out; `WINE_LARGE_ADDRESS_AWARE=0` turns it off for the session, and the registry key can then turn it on for one game.
+- CrossOver's kernel32 also stops clamping `GlobalMemoryStatus` to 2 GB for such programs once they count as large-address-aware, so old games that read total memory into a signed int could misjudge it. Upstream Wine and Proton don't have that hack. Steam's own 32-bit helpers (`SteamService.exe`, `gameoverlayui.exe` and others) also get the setting; the sign-in check passes with it.
+
 ## Controllers
 
 - Wine's `winebus.sys` reads controllers through SDL2 (built by `build-sdl.sh`, 2.32.10, x86_64; Wine loads `libSDL2-2.0.0.dylib` through the `deps/lib` rpath). Without it, winebus logs `SDL support not compiled in!` and games see no gamepads. CodeWeavers' winebus also turns on PS4/PS5 rumble over Bluetooth.
