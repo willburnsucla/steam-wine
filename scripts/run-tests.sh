@@ -23,6 +23,7 @@ build x86_64-w64-mingw32-gcc wasapitest.exe wasapitest.c -lole32 -luuid
 build x86_64-w64-mingw32-gcc mp3test.exe mp3test.c -lole32 -lstrmiids -luuid
 build i686-w64-mingw32-gcc mp3test32.exe mp3test.c -lole32 -lstrmiids -luuid
 build i686-w64-mingw32-gcc memtest32.exe memtest.c
+build x86_64-w64-mingw32-gcc padtest.exe padtest.c -ldinput8 -ldxguid -lxinput -lole32
 cp "$T/d3d11test.exe" "$ROOT/dist/dxvk/x64/d3d11.dll" "$ROOT/dist/dxvk/x64/dxgi.dll" "$C/dxvktest/"
 python3 -I "$T/make-silent-mp3.py" "$C/silence.mp3" 3 > /dev/null
 
@@ -51,6 +52,20 @@ check "WASAPI 5.1 downmix" "WINE_COREAUDIO_FORCE_5_1=1" -- 'C:\wasapitest.exe'
 check "MP3 via DirectShow 32-bit" -- 'C:\mp3test32.exe'
 check "MP3 via DirectShow 64-bit" -- 'C:\mp3test.exe'
 check "4 GB for 32-bit games" "WINE_LARGE_ADDRESS_AWARE=1" -- 'C:\memtest32.exe'
+# Controller support: winebus (in a fresh prefix session, so its log is ours) must start its
+# SDL bus. Without a controller attached that's as far as an automated check can go; padtest.exe
+# lists real controllers.
+"$ROOT/dist/bin/wineserver" -k 2>/dev/null; sleep 1
+# "main loop started" alone isn't proof (a bus that failed to init logs it too), so also require
+# that neither SDL failure message appears.
+out=$(WINEDEBUG='+hid' "$ROOT/scripts/wine-run.sh" 60 'C:\padtest.exe' 1 2>&1)
+if grep -q 'L"SDL" main loop started' <<<"$out" && ! grep -q 'SDL support not compiled in' <<<"$out" \
+    && ! grep -q 'L"SDL" bus init returned' <<<"$out"; then
+    printf 'PASS  Controller support (SDL bus started)\n'
+else
+    printf 'FAIL  Controller support (SDL bus started)\n'; fails=$((fails + 1))
+    grep -E 'SDL' <<<"$out" | sed 's/^/      /' | head -5
+fi
 "$ROOT/dist/bin/wineserver" -k 2>/dev/null
 
 if [ "${1:-}" = "--steam" ]; then

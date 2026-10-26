@@ -10,6 +10,7 @@ While CrossOver is good software, it costs $74 per Mac, and every free option I 
 - Direct3D 10/11 games through DXMT (Metal), with DXVK (Vulkan through MoltenVK) as a per-game fallback.
 - Direct3D 12 through DXMT's experimental D3D12 support; a test program renders and presents correctly, but don't expect demanding DX12 games to run yet.
 - Vulkan through MoltenVK.
+- Game controllers (Xbox, PlayStation, Switch Pro; USB or Bluetooth) through SDL2. Wine's controller layer is verified to start with SDL; a physical controller hasn't been tested yet. `tools/padtest.exe` lists the controllers games can see.
 - 4 GB of address space for 32-bit games, without patching their executables (Fallout 3 and New Vegas otherwise run out at 2 GB).
 - Media playback through GStreamer (DirectShow and Media Foundation), so older games' MP3 music plays; Fallout 3, New Vegas and Oblivion use it.
 - Retina rendering at 2x.

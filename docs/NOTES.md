@@ -52,6 +52,12 @@ CrossOver's Steam profile adds fonts, the VC++ runtime, `d3dcompiler_47` and msy
 - GLib needed three fixes: the tarball ships `subprojects/gvdb` as an empty submodule folder (removed so meson uses the wrap), its D-Bus code generator imports `distutils`, gone since Python 3.12 (`patches/glib/0001`), and 2.78 uses older option names (`man`, `gtk_doc`, no `introspection`). GStreamer is told `-Dbuild-tools-source=system`, otherwise it fetches its own bison and pcre2 on macOS.
 - `scripts/runtime-env.sh` points GStreamer at our plugins only and keeps its registry in `prefixes/gst-registry.bin`, so another GStreamer on the Mac never mixes in. The first media playback after a rebuild takes a few extra seconds while the registry is built.
 
+## Controllers
+
+- Wine's `winebus.sys` reads controllers through SDL2 (built by `build-sdl.sh`, 2.32.10, x86_64; Wine loads `libSDL2-2.0.0.dylib` through the `deps/lib` rpath). Without it, winebus logs `SDL support not compiled in!` and games see no gamepads. CodeWeavers' winebus also turns on PS4/PS5 rumble over Bluetooth.
+- `run-tests.sh` checks that winebus logs `L"SDL" main loop started` with neither SDL failure message (a bus that failed to init also logs "main loop started", so that line alone proves nothing). The XBOX bus is disabled by Wine on macOS 15+ and UDEV/IOHID are other backends; SDL is the one that maps gamepads.
+- `tools/padtest.c` lists XInput and DirectInput controllers and prints button state; it needs a physical controller to pass.
+
 ## Audio
 
 - Every MacGamingDB report for LEGO Star Wars: The Skywalker Saga mentions missing or quiet dialog: the game expects 5.1, and dialog is on the center channel. An offline AudioConverter test showed that CoreAudio's 5.1-to-stereo conversion maps channels and drops the center, so tagging a stream as 5.1 isn't enough. Patch 0002 mixes it down in Wine's render callback: L = FL + 0.707 C + 0.707 BL, R = FR + 0.707 C + 0.707 BR, LFE dropped, clipped.

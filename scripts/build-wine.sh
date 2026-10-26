@@ -36,11 +36,11 @@ configure_wine() {
         --prefix="$WINE_PREFIX_DIR" \
         --enable-archs=i386,x86_64 \
         --with-mingw \
-        --with-coreaudio --with-cups --with-gstreamer --with-vulkan --with-freetype --with-gnutls --with-opencl \
+        --with-coreaudio --with-cups --with-gstreamer --with-sdl --with-vulkan --with-freetype --with-gnutls --with-opencl \
         --without-alsa --without-capi --without-dbus --without-ffmpeg --without-fontconfig \
         --without-gettext --without-gettextpo --without-gphoto --without-gssapi \
         --without-inotify --without-krb5 --without-netapi --without-oss \
-        --without-pcap --without-pcsclite --without-pulse --without-sane --without-sdl \
+        --without-pcap --without-pcsclite --without-pulse --without-sane \
         --without-udev --without-usb --without-v4l2 --without-wayland --without-x \
         --disable-tests
 }

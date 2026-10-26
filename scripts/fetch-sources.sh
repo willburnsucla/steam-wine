@@ -1,7 +1,7 @@
 #!/bin/bash
 # Download and pin every source this project builds. Safe to re-run; skips what's present.
 #   downloads/  crossover-sources-26.3.0.tar.gz (CodeWeavers' LGPL source), nettle-3.10.tar.gz,
-#               mpg123-1.33.7.tar.bz2
+#               mpg123-1.33.7.tar.bz2, SDL2-2.32.10.tar.gz
 #   src/        sources/ (extracted CrossOver tarball), dxmt, llvm-project, moltenvk-upstream,
 #               dxvk-macos
 set -euo pipefail
@@ -31,6 +31,8 @@ fetch https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz \
     nettle-3.10.tar.gz b4c518adb174e484cb4acea54118f02380c7133771e7e9beb98a0787194ee47c
 fetch https://www.mpg123.de/download/mpg123-1.33.7.tar.bz2 \
     mpg123-1.33.7.tar.bz2 31d0e35a4ca567ec9b5ebda6c3062bb4435d6d3eacd6ef0d95cadd7854dc03ee
+fetch https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10.tar.gz \
+    SDL2-2.32.10.tar.gz 5f5993c530f084535c65a6879e9b26ad441169b3e25d789d83287040a9ca5165
 [ -d "$ROOT/src/sources/wine" ] || tar -xzf "$ROOT/downloads/crossover-sources-26.3.0.tar.gz" -C "$ROOT/src"
 
 clone https://github.com/3Shain/dxmt.git dxmt 9839e55f98d4aca103957ee4132d6395a325a9ed
