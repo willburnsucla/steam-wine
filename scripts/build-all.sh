@@ -4,6 +4,7 @@ set -euo pipefail
 S="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$S/fetch-sources.sh"
 "$S/build-deps.sh"        # x86_64 gmp, nettle, gnutls, freetype
+"$S/build-gstreamer.sh"   # libmpg123, GLib, GStreamer (media playback for winegstreamer)
 "$S/build-moltenvk.sh"    # Vulkan on Metal (needed by Wine's --with-vulkan)
 "$S/build-wine.sh"        # CrossOver's Wine + patches/, installed into dist/
 "$S/build-dxmt.sh"        # LLVM 15, then DXMT 64- and 32-bit

@@ -10,6 +10,7 @@ While CrossOver is good software, it costs $74 per Mac, and every free option I 
 - Direct3D 10/11 games through DXMT (Metal), with DXVK (Vulkan through MoltenVK) as a per-game fallback.
 - Direct3D 12 through DXMT's experimental D3D12 support; a test program renders and presents correctly, but don't expect demanding DX12 games to run yet.
 - Vulkan through MoltenVK.
+- Media playback through GStreamer (DirectShow and Media Foundation), so older games' MP3 music plays; Fallout 3, New Vegas and Oblivion use it.
 - Retina rendering at 2x.
 - Game audio offered as 5.1 and mixed down to stereo, so center-channel dialog isn't lost; audio follows the macOS output device (headphones connected mid-game get the sound).
 
@@ -35,7 +36,7 @@ scripts/build-all.sh
 scripts/install-steam.sh
 ```
 
-`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and sets Retina scaling.
+`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, GStreamer, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `scripts/run-tests.sh` builds small test programs and checks each piece (DirectX 9/11/12, Vulkan, audio, MP3 playback); `--steam` adds a check that Steam's sign-in window is drawn. `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and sets Retina scaling.
 
 ## Play
 
@@ -58,6 +59,7 @@ The black Steam window was the hard part. Steam's web helper, a build of Chromiu
 | `0003-winemac-debug-surface-dump` | `WINE_MACDRV_DUMP_DIR` saves each window surface handed to Cocoa, for debugging without screen capture |
 | `0004-winecoreaudio-follow-default-output-device` | Audio on the default device follows macOS output changes |
 | `dxvk/0001`, `dxvk/0002` | Header fixes for mingw-w64 14 |
+| `glib/0001` | GLib 2.78's D-Bus code generator without Python's removed `distutils` |
 
 ## Credits
 

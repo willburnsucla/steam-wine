@@ -9,6 +9,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIMIT=${1:?seconds}; shift
 MAX_PROCS=${MAX_PROCS:-60}
 
+source "$ROOT/scripts/runtime-env.sh"
 export WINEPREFIX="${WINEPREFIX:-$ROOT/prefixes/test}"
 export PATH="$ROOT/dist/bin:$PATH"
 export WINEDEBUG="${WINEDEBUG:-fixme-all}"

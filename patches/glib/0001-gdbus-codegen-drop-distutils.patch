@@ -1,0 +1,26 @@
+--- a/gio/gdbus-2.0/codegen/utils.py
++++ b/gio/gdbus-2.0/codegen/utils.py
+@@ -19,7 +19,7 @@
+ #
+ # Author: David Zeuthen <davidz@redhat.com>
+ 
+-import distutils.version
++import re
+ import os
+ import sys
+ 
+@@ -159,11 +159,12 @@
+ def version_cmp_key(key):
+     # If the 'since' version is 'UNRELEASED', compare higher than anything else
+     # If it is empty put a 0 in its place as this will
+-    # allow LooseVersion to work and will always compare lower.
++    # always compare lower.
+     if key[0] == "UNRELEASED":
+         v = "9999"
+     elif key[0]:
+         v = str(key[0])
+     else:
+         v = "0"
+-    return (distutils.version.LooseVersion(v), key[1])
++    # distutils (LooseVersion) is gone from Python 3.12; compare the numeric parts instead.
++    return (tuple(int(n) for n in re.findall(r"\d+", v)), key[1])

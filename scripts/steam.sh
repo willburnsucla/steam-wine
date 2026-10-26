@@ -12,6 +12,7 @@
 # Usage: scripts/steam.sh [extra steam args]   (Ctrl-C or `scripts/steam.sh --stop` to quit)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/scripts/runtime-env.sh"
 export WINEPREFIX="$ROOT/prefixes/steam"
 export WINEMSYNC=1
 export WINE_COREAUDIO_FORCE_5_1="${WINE_COREAUDIO_FORCE_5_1:-1}"

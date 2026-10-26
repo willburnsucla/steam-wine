@@ -45,6 +45,13 @@ CrossOver's Steam profile adds fonts, the VC++ runtime, `d3dcompiler_47` and msy
 - `scripts/check-login-visual.sh` automates the check: it launches Steam with the surface dump and reports how much of the sign-in window is non-black.
 - Steam client updates replace the helper after the launcher's check, so the restarted Steam runs it unwrapped. `steam.sh` runs a watcher next to Steam that re-wraps the file and stops unwrapped helpers (only when no `steamwebhelper_real.exe` is running, on two checks in a row); Steam restarts the helper through the wrapper. The watcher disables `set -e`/`pipefail`, since a grep with no match would otherwise end it, and matches process names case-insensitively (`steam.exe` and `Steam.exe` both occur).
 
+## Media playback (GStreamer)
+
+- Wine's DirectShow and Media Foundation decoders go through winegstreamer. Without it, `IGraphBuilder::RenderFile` on an MP3 fails with `VFW_E_CANNOT_RENDER`, which is how Fallout 3, New Vegas and Oblivion play music. `tools/mp3test.c` plays a generated silent MP3 (`tools/make-silent-mp3.py`) through DirectShow; with GStreamer the graph is Reader → MPEG-I Stream Splitter → MPEG Layer-3 Decoder → DirectSound.
+- `build-gstreamer.sh` builds libmpg123 1.33.7 (upstream, signed by its maintainer), then GLib 2.78 and GStreamer 1.24.4 from the CrossOver tarball, all x86_64 into `deps/`, with every optional feature off except: core elements, app, audioconvert, audioresample, playback (decodebin), typefind, volume, videoconvertscale, audioparsers, id3demux, mpg123, wavparse.
+- GLib needed three fixes: the tarball ships `subprojects/gvdb` as an empty submodule folder (removed so meson uses the wrap), its D-Bus code generator imports `distutils`, gone since Python 3.12 (`patches/glib/0001`), and 2.78 uses older option names (`man`, `gtk_doc`, no `introspection`). GStreamer is told `-Dbuild-tools-source=system`, otherwise it fetches its own bison and pcre2 on macOS.
+- `scripts/runtime-env.sh` points GStreamer at our plugins only and keeps its registry in `prefixes/gst-registry.bin`, so another GStreamer on the Mac never mixes in. The first media playback after a rebuild takes a few extra seconds while the registry is built.
+
 ## Audio
 
 - Every MacGamingDB report for LEGO Star Wars: The Skywalker Saga mentions missing or quiet dialog: the game expects 5.1, and dialog is on the center channel. An offline AudioConverter test showed that CoreAudio's 5.1-to-stereo conversion maps channels and drops the center, so tagging a stream as 5.1 isn't enough. Patch 0002 mixes it down in Wine's render callback: L = FL + 0.707 C + 0.707 BL, R = FR + 0.707 C + 0.707 BR, LFE dropped, clipped.
