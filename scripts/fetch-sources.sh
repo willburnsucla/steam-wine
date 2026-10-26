@@ -30,7 +30,7 @@ fetch https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz \
     nettle-3.10.tar.gz b4c518adb174e484cb4acea54118f02380c7133771e7e9beb98a0787194ee47c
 [ -d "$ROOT/src/sources/wine" ] || tar -xzf "$ROOT/downloads/crossover-sources-26.3.0.tar.gz" -C "$ROOT/src"
 
-clone https://github.com/3Shain/dxmt.git dxmt 186a2327f1ec76376f6bc1ef64636f08b0728567
+clone https://github.com/3Shain/dxmt.git dxmt 9839e55f98d4aca103957ee4132d6395a325a9ed
 git -C "$ROOT/src/dxmt" submodule update -q --init --depth 1
 clone https://github.com/llvm/llvm-project.git llvm-project llvmorg-15.0.7
 clone https://github.com/KhronosGroup/MoltenVK.git moltenvk-upstream v1.4.2

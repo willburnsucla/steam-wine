@@ -32,8 +32,9 @@ build_llvm() {
 build_dxmt64() {
     cd "$DXMT_SRC"
     rm -rf "$BUILD/dxmt64"
+    # enable_d3d12: DXMT's Direct3D 12 implementation (experimental upstream, off by default).
     meson setup --cross-file build-win64.txt \
-        -Dnative_llvm_path="$LLVM_OUT" -Dwine_build_path="$BUILD/wine" \
+        -Dnative_llvm_path="$LLVM_OUT" -Dwine_build_path="$BUILD/wine" -Denable_d3d12=true \
         "$BUILD/dxmt64" --buildtype release --prefix "$DXMT_OUT" --strip
     meson compile -C "$BUILD/dxmt64" && meson install -C "$BUILD/dxmt64"
 }

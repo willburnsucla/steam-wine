@@ -32,6 +32,7 @@ CrossOver's Steam profile adds fonts, the VC++ runtime, `d3dcompiler_47` and msy
 
 - DXMT needs LLVM 15 (exact major version) built for x86_64, Xcode's Metal toolchain, and `MACOSX_DEPLOYMENT_TARGET=14.0` (it uses `std::to_chars`). Its DLLs are built as Wine builtins and installed into `dist/` by `install-dxmt.sh`, which keeps Wine's originals for `install-dxmt.sh off`.
 - DXMT doesn't support swapchains created by one process for another process's window ("cross-process swapchain not supported yet", DXMT issue #141).
+- DXMT's D3D12 implementation (about 9,300 lines, `-Denable_d3d12=true`) is off by default upstream and changing quickly. `tools/d3d12test.c` (device, flip-model swapchain, clear, present, readback) passes on an M5 Pro. `install-dxmt.sh` replaces Wine's vkd3d-based `d3d12.dll` and keeps it for `off`.
 - MoltenVK: CodeWeavers' copy can't be built from the tarball, because its `fetchDependencies` pins a SPIRV-Cross commit that exists only in an unpublished fork. Upstream MoltenVK 1.4.2 works. Wine loads it directly (`SONAME_LIBVULKAN = libMoltenVK.dylib`, found through the `deps/lib` rpath), so no portability-enumeration patch is needed.
 - DXVK: CodeWeavers' 1.10.3 requires `geometryShader`, which upstream MoltenVK lacks. Gcenx's DXVK-macOS makes it optional. mingw-w64 14 needed two header fixes (`patches/dxvk`) and a forced `#include <cstdint>`.
 
@@ -42,6 +43,7 @@ CrossOver's Steam profile adds fonts, the VC++ runtime, `d3dcompiler_47` and msy
 - Steam's web helper composites in a separate GPU process and draws into a window owned by the browser process. Wine's macOS driver can't draw across processes; Wine bug 56014 describes the same black window on Wine's Wayland driver. With the GPU on and DXMT installed, the same thing fails at the swapchain instead (DXMT #141).
 - Steam ignores `-cef-single-process` (it never passes it to Chromium). The wrapper in `tools/webhelper-wrapper.c` starts the real helper with `--in-process-gpu`; Steam restores the original helper on startup unless launched with `-noverifyfiles`. With both, the window surface is fully drawn.
 - `scripts/check-login-visual.sh` automates the check: it launches Steam with the surface dump and reports how much of the sign-in window is non-black.
+- Steam client updates replace the helper after the launcher's check, so the restarted Steam runs it unwrapped. `steam.sh` runs a watcher next to Steam that re-wraps the file and stops unwrapped helpers (only when no `steamwebhelper_real.exe` is running, on two checks in a row); Steam restarts the helper through the wrapper. The watcher disables `set -e`/`pipefail`, since a grep with no match would otherwise end it, and matches process names case-insensitively (`steam.exe` and `Steam.exe` both occur).
 
 ## Audio
 

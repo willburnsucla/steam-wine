@@ -8,6 +8,7 @@ While CrossOver is good software, it costs $74 per Mac, and every free option I 
 
 - Windows Steam: install, self-update, sign-in, library, downloads.
 - Direct3D 10/11 games through DXMT (Metal), with DXVK (Vulkan through MoltenVK) as a per-game fallback.
+- Direct3D 12 through DXMT's experimental D3D12 support; a test program renders and presents correctly, but don't expect demanding DX12 games to run yet.
 - Vulkan through MoltenVK.
 - Retina rendering at 2x.
 - Game audio offered as 5.1 and mixed down to stereo, so center-channel dialog isn't lost; audio follows the macOS output device (headphones connected mid-game get the sound).
@@ -15,7 +16,7 @@ While CrossOver is good software, it costs $74 per Mac, and every free option I 
 ## What doesn't
 
 - Games with kernel-level anti-cheat (Valorant, Fortnite, many shooters); no Wine setup runs those.
-- Direct3D 12. CrossOver uses Apple's closed-source D3DMetal for it, which this project doesn't include.
+- Reliable Direct3D 12. DXMT's implementation is young; CrossOver uses Apple's closed-source D3DMetal, which this project doesn't include.
 - Life after Rosetta. Wine's macOS side runs as an x86_64 program under Rosetta 2, which Apple keeps fully available through macOS 27 only; see docs/NOTES.md.
 
 ## Requirements
@@ -48,7 +49,7 @@ Double-click `Steam (Wine).command`, or run `scripts/steam.sh`. Sign in, install
 
 Wine's macOS side still runs under Rosetta, so every library it links against has to be an Intel build; `build-deps.sh` cross-compiles gmp, nettle, gnutls and freetype from the arm64 side into `deps/`. The CrossOver tarball isn't quite buildable as shipped (nettle is missing its Makefile.in, gnutls's configure never links nettle, and freetype wants a git submodule that isn't there), and `docs/NOTES.md` covers each workaround.
 
-The black Steam window was the hard part. Steam's web helper, a build of Chromium 126, runs its compositor in a separate GPU process that draws into a window owned by the browser process; while Windows and Linux handle that without complaint, Wine's macOS driver can't draw across processes, so the sign-in window stayed black even though the page itself rendered. CrossOver gets around this through D3DMetal. This project instead wraps `steamwebhelper.exe` (`tools/webhelper-wrapper.c`) and starts the real helper with `--in-process-gpu`, which keeps the compositor inside the process that owns the window. Steam restores its original helper whenever file sizes don't match, hence `-noverifyfiles`; the launcher reinstalls the wrapper whenever a Steam update replaces it.
+The black Steam window was the hard part. Steam's web helper, a build of Chromium 126, runs its compositor in a separate GPU process that draws into a window owned by the browser process; while Windows and Linux handle that without complaint, Wine's macOS driver can't draw across processes, so the sign-in window stayed black even though the page itself rendered. CrossOver gets around this through D3DMetal. This project instead wraps `steamwebhelper.exe` (`tools/webhelper-wrapper.c`) and starts the real helper with `--in-process-gpu`, which keeps the compositor inside the process that owns the window. Steam restores its original helper whenever file sizes don't match, hence `-noverifyfiles`. A Steam client update still replaces the helper mid-launch, so the launcher keeps a small watcher running alongside Steam; it re-wraps a replaced helper and stops an unwrapped one, and Steam restarts its helper through the wrapper within about 10 seconds.
 
 | Patch | What it does |
 |---|---|

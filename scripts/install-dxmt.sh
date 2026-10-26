@@ -12,6 +12,7 @@ LIB="$ROOT/dist/lib/wine"
 DX="$ROOT/dist/dxmt"
 BACKUP="$LIB/wined3d-originals"
 DLLS="d3d11 dxgi d3d10core"
+D3D12=d3d12   # 64-bit only, and only if DXMT was built with enable_d3d12
 
 case $MODE in
 on)
@@ -21,11 +22,16 @@ on)
             [ -e "$BACKUP/$arch/$d.dll" ] || cp -p "$LIB/$arch/$d.dll" "$BACKUP/$arch/$d.dll"
         done
     done
+    [ -e "$BACKUP/x86_64-windows/$D3D12.dll" ] || cp -p "$LIB/x86_64-windows/$D3D12.dll" "$BACKUP/x86_64-windows/"
     cp "$DX/x86_64-unix/winemetal.so" "$LIB/x86_64-unix/"
     for d in $DLLS winemetal; do
         cp "$DX/x86_64-windows/$d.dll" "$LIB/x86_64-windows/"
         cp "$DX/i386/i386-windows/$d.dll" "$LIB/i386-windows/"
     done
+    if [ -f "$DX/x86_64-windows/$D3D12.dll" ]; then
+        cp "$DX/x86_64-windows/$D3D12.dll" "$LIB/x86_64-windows/"
+        cp "$DX/x86_64-windows/$D3D12.dll" "$PREFIX/drive_c/windows/system32/"
+    fi
     cp "$DX/x86_64-windows/winemetal.dll" "$PREFIX/drive_c/windows/system32/"
     cp "$DX/i386/i386-windows/winemetal.dll" "$PREFIX/drive_c/windows/syswow64/"
     # The prefix's system32 holds copies of builtin DLLs from wineboot; refresh them too.
@@ -43,6 +49,10 @@ off)
         cp -p "$BACKUP/x86_64-windows/$d.dll" "$PREFIX/drive_c/windows/system32/"
         cp -p "$BACKUP/i386-windows/$d.dll" "$PREFIX/drive_c/windows/syswow64/"
     done
+    if [ -f "$BACKUP/x86_64-windows/$D3D12.dll" ]; then
+        cp -p "$BACKUP/x86_64-windows/$D3D12.dll" "$LIB/x86_64-windows/"
+        cp -p "$BACKUP/x86_64-windows/$D3D12.dll" "$PREFIX/drive_c/windows/system32/"
+    fi
     rm -f "$LIB/x86_64-unix/winemetal.so" "$LIB/x86_64-windows/winemetal.dll" "$LIB/i386-windows/winemetal.dll"
     echo "DXMT off (wined3d)"
     ;;

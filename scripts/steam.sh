@@ -43,4 +43,38 @@ install_webhelper_wrapper() {
 }
 install_webhelper_wrapper
 
+# Is a process whose command line contains $1 running? (grep -v grep: grep's own command
+# line contains the pattern.)
+running() { ps -axo args | grep -v grep | grep -qiF "$1"; }   # Steam shows as steam.exe or Steam.exe
+
+# A Steam client update replaces the helper mid-launch, after the check above, so the restarted
+# Steam would run it unwrapped (black window). While Steam runs, re-wrap a replaced helper and
+# stop an unwrapped one; Steam restarts its helper, this time through the wrapper.
+watch_webhelper() {
+    # This runs in a background subshell; a grep with no match must not end it.
+    set +e +o pipefail
+    local cef="$WINEPREFIX/drive_c/Program Files (x86)/Steam/bin/cef/cef.win64"
+    local wrapper="$ROOT/tools/steamwebhelper-wrapper.exe" seen=0 strikes=0 pids
+    while sleep 2; do
+        if running 'C:\Program Files (x86)\Steam\steam.exe'; then
+            seen=1
+        elif [ $seen = 1 ]; then
+            break   # Steam has exited
+        fi
+        [ -f "$cef/steamwebhelper.exe" ] || continue
+        cmp -s "$cef/steamwebhelper.exe" "$wrapper" || install_webhelper_wrapper
+        # Unwrapped = helper processes running but none of them is steamwebhelper_real.exe.
+        # Require it on two checks in a row, so a wrapper that is still starting its real
+        # helper isn't mistaken for an unwrapped one.
+        pids=$(ps -axo pid,args | grep -F 'cef.win64\steamwebhelper.exe' | grep -v grep | awk '{print $1}')
+        if [ -n "$pids" ] && ! running 'cef.win64\steamwebhelper_real.exe'; then
+            strikes=$((strikes + 1))
+            [ $strikes -ge 2 ] && { kill $pids 2>/dev/null; strikes=0; }
+        else
+            strikes=0
+        fi
+    done
+}
+watch_webhelper > /dev/null 2>&1 &
+
 exec "$ROOT/dist/bin/wine" 'C:\Program Files (x86)\Steam\steam.exe' -cef-disable-gpu -noverifyfiles "$@"
