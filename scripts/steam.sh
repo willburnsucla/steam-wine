@@ -9,13 +9,18 @@
 #    (patches/0002). Meant to fix center-channel dialog going missing (LEGO Skywalker Saga);
 #    untested in-game.
 #    WINE_COREAUDIO_FORCE_5_1=0 turns it off.
+#  - 4 GB of address space for 32-bit games (Fallout 3/New Vegas run out at 2 GB), without
+#    patching their exes. WINE_LARGE_ADDRESS_AWARE=0 turns it off.
 # Usage: scripts/steam.sh [extra steam args]   (Ctrl-C or `scripts/steam.sh --stop` to quit)
+#        scripts/steam.sh --exec <program> [args]   run a program in Steam's prefix with Steam's
+#            environment (installers, mod managers, tests); EXEC_TIME_LIMIT=<s> adds a limit
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/scripts/runtime-env.sh"
 export WINEPREFIX="$ROOT/prefixes/steam"
 export WINEMSYNC=1
 export WINE_COREAUDIO_FORCE_5_1="${WINE_COREAUDIO_FORCE_5_1:-1}"
+export WINE_LARGE_ADDRESS_AWARE="${WINE_LARGE_ADDRESS_AWARE:-1}"
 export WINEDEBUG="${WINEDEBUG:--all}"
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-mscoree,mshtml=;winemenubuilder.exe=d}"
 export DXMT_LOG_PATH="${DXMT_LOG_PATH:-Z:${ROOT//\//\\}\\logs\\dxmt\\}"
@@ -23,6 +28,14 @@ mkdir -p "$ROOT/logs/dxmt"
 
 if [ "${1:-}" = "--stop" ]; then
     exec "$ROOT/dist/bin/wineserver" -k
+fi
+
+if [ "${1:-}" = "--exec" ]; then
+    shift
+    if [ -n "${EXEC_TIME_LIMIT:-}" ]; then
+        exec "$ROOT/scripts/wine-run.sh" "$EXEC_TIME_LIMIT" "$@"
+    fi
+    exec "$ROOT/dist/bin/wine" "$@"
 fi
 
 # Steam's web helper draws its UI from a separate GPU process into a window owned by another

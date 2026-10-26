@@ -22,6 +22,7 @@ build x86_64-w64-mingw32-gcc vktest.exe vktest.c
 build x86_64-w64-mingw32-gcc wasapitest.exe wasapitest.c -lole32 -luuid
 build x86_64-w64-mingw32-gcc mp3test.exe mp3test.c -lole32 -lstrmiids -luuid
 build i686-w64-mingw32-gcc mp3test32.exe mp3test.c -lole32 -lstrmiids -luuid
+build i686-w64-mingw32-gcc memtest32.exe memtest.c
 cp "$T/d3d11test.exe" "$ROOT/dist/dxvk/x64/d3d11.dll" "$ROOT/dist/dxvk/x64/dxgi.dll" "$C/dxvktest/"
 python3 -I "$T/make-silent-mp3.py" "$C/silence.mp3" 3 > /dev/null
 
@@ -49,6 +50,7 @@ check "WASAPI stereo" "WINE_COREAUDIO_FORCE_5_1=0" -- 'C:\wasapitest.exe'
 check "WASAPI 5.1 downmix" "WINE_COREAUDIO_FORCE_5_1=1" -- 'C:\wasapitest.exe'
 check "MP3 via DirectShow 32-bit" -- 'C:\mp3test32.exe'
 check "MP3 via DirectShow 64-bit" -- 'C:\mp3test.exe'
+check "4 GB for 32-bit games" "WINE_LARGE_ADDRESS_AWARE=1" -- 'C:\memtest32.exe'
 "$ROOT/dist/bin/wineserver" -k 2>/dev/null
 
 if [ "${1:-}" = "--steam" ]; then

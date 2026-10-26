@@ -10,6 +10,7 @@ While CrossOver is good software, it costs $74 per Mac, and every free option I 
 - Direct3D 10/11 games through DXMT (Metal), with DXVK (Vulkan through MoltenVK) as a per-game fallback.
 - Direct3D 12 through DXMT's experimental D3D12 support; a test program renders and presents correctly, but don't expect demanding DX12 games to run yet.
 - Vulkan through MoltenVK.
+- 4 GB of address space for 32-bit games, without patching their executables (Fallout 3 and New Vegas otherwise run out at 2 GB).
 - Media playback through GStreamer (DirectShow and Media Foundation), so older games' MP3 music plays; Fallout 3, New Vegas and Oblivion use it.
 - Retina rendering at 2x.
 - Game audio offered as 5.1 and mixed down to stereo, so center-channel dialog isn't lost; audio follows the macOS output device (headphones connected mid-game get the sound).
@@ -43,6 +44,7 @@ scripts/install-steam.sh
 Double-click `Steam (Wine).command`, or run `scripts/steam.sh`. Sign in, install a game, play. Steam updates itself on the first launch (about 250 MB), and a game's first run is slow while shaders compile.
 
 - `scripts/steam.sh --stop` quits Steam and everything Wine started.
+- `scripts/steam.sh --exec <program>` runs a Windows program (an installer, a mod manager) inside Steam's environment with the same settings.
 - `scripts/game-graphics.sh <path to the game's exe> dxvk` switches one game to DXVK; `dxmt` switches it back.
 - `WINE_COREAUDIO_FORCE_5_1=0 scripts/steam.sh` turns off the 5.1 downmix, and `WINE_COREAUDIO_FOLLOW_DEFAULT=0` keeps game audio on the device that was selected when the game started.
 
