@@ -42,8 +42,9 @@ scripts/install-steam.sh
 
 ## Play
 
-Double-click `Steam (Wine).command`, or run `scripts/steam.sh`. Sign in, install a game, play. Steam updates itself on the first launch (about 250 MB), and a game's first run is slow while shaders compile.
+Open OpenRunner (`scripts/build-app.sh --install` builds it and puts it in your Applications folder), or run `scripts/steam.sh` from a terminal. Sign in, install a game, play. Quitting OpenRunner quits Steam and everything Wine started. Steam updates itself on the first launch (about 250 MB), and a game's first run is slow while shaders compile.
 
+- `scripts/build-app.sh --name <name> --icon <image>` rebuilds the app with another name or icon (any square image macOS can read; the default is `art/openrunner-icon.svg`). Rebuild it if you move the project folder.
 - `scripts/steam.sh --stop` quits Steam and everything Wine started.
 - `scripts/steam.sh --exec <program>` runs a Windows program (an installer, a mod manager) inside Steam's environment with the same settings. Start Steam first if the program launches a game, so the game's Steam session gets Steam's fixes.
 - `scripts/game-graphics.sh <path to the game's exe> dxvk` switches one game to DXVK; `dxmt` switches it back.
