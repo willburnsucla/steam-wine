@@ -182,9 +182,9 @@ if [ "$MODE" = --steam ]; then
 
     line=$("$ROOT/scripts/check-login-visual.sh" regression)
     if grep -q 'nonblack=100.0%' <<<"$line" && grep -q 'login=yes' <<<"$line"; then
-        printf 'PASS  Steam sign-in window drawn\n'
+        printf 'PASS  Steam window drawn\n'
     else
-        printf 'FAIL  Steam sign-in window drawn\n      %s\n' "$line"; fails=$((fails + 1))
+        printf 'FAIL  Steam window drawn\n      %s\n' "$line"; fails=$((fails + 1))
     fi
 fi
 

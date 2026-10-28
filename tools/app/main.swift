@@ -158,9 +158,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // Clicking the Dock icon brings Steam's window forward: a second steam.exe hands over to the
-    // running one and exits. (If only a game was left running, it starts Steam again.)
+    // running one and exits. Launch mode, so a Steam that isn't running starts with its fixes.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !quitting { try? runScript(["--exec", "C:\\Program Files (x86)\\Steam\\steam.exe"]).run() }
+        if !quitting { try? runScript([]).run() }
         return false
     }
 

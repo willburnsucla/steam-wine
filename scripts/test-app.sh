@@ -19,6 +19,11 @@ NTDLL="$ROOT/dist/lib/wine/x86_64-unix/ntdll.so"
 wine_procs() { lsof -t "$NTDLL" 2>/dev/null | wc -l | tr -d ' '; }
 watchers() { ps -axo args | grep -v grep | grep -c "$ROOT/scripts/steam.sh"; }
 app_running() { pgrep -xq "$NAME"; }
+steam_count() { # steam.exe processes in our Wine
+    local p
+    for p in $(lsof -t "$NTDLL" 2>/dev/null); do ps -o args= -p "$p"; done |
+        grep -ciE '^C:\\Program Files \(x86\)\\Steam\\steam\.exe'
+}
 fails=0
 result() { if [ "$1" = ok ]; then printf 'PASS  %s\n' "$2"; else printf 'FAIL  %s\n' "$2"; fails=$((fails + 1)); fi; }
 check() { if eval "$2"; then result ok "$1"; else result no "$1"; fi; }
@@ -29,11 +34,11 @@ stop_all() { # leave nothing running for the next scenario
     pkill -x "$NAME" 2>/dev/null
     sleep 3
 }
-wait_signin() { # since-timestamp: wait up to 180 s for Steam's sign-in window (usually a few
-    local _      # seconds, but a busy Mac, e.g. Spotlight indexing, can stretch it past a minute)
+wait_signin() { # since-timestamp: wait up to 180 s for Steam's sign-in window, or its main
+    local _      # window when it signs in by itself (usually seconds; a busy Mac can take a minute)
     for _ in $(seq 1 180); do
         awk -v s="[$1]" 'substr($0,1,21) >= s' "$L/webhelper.txt" 2>/dev/null |
-            grep -q 'DesktopLoginWindow.*WasHidden 0' && return 0
+            grep -qE '(DesktopLoginWindow|SP Desktop_uid[0-9]+)[^:]*: WasHidden 0' && return 0
         sleep 1
     done
     return 1
@@ -53,13 +58,18 @@ quit_and_check() { # label: quit the app, then check everything stopped
 [ -d "$APP" ] || { printf 'FAIL  %s exists\n' "$APP"; exit 1; }
 stop_all
 
-# 1. Normal start and quit.
+# 1. Normal start and quit, with a second click while Steam is still starting.
 since=$(date '+%Y-%m-%d %H:%M:%S')
 open "$APP"
-check "app starts Steam to its sign-in window" 'wait_signin "$since"'
+sleep 3
+open "$APP"   # what an impatient second click does
+check "app starts Steam to its window" 'wait_signin "$since"'
+sleep 5
+check "second click while starting doesn't start a second Steam" '[ "$(steam_count)" = 1 ]'
 open "$APP"   # app already running: macOS sends it a reopen, as a Dock click does
 sleep 8
 check "reopen keeps a single app" '[ "$(pgrep -x "$NAME" | wc -l | tr -d " ")" = 1 ]'
+check "reopen keeps a single Steam" '[ "$(steam_count)" = 1 ]'
 quit_and_check "normal"
 stop_all
 

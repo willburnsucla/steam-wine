@@ -13,7 +13,7 @@ While CrossOver is good software, it costs $74 per Mac, and every free option I 
 - Game controllers through SDL2. Xbox and Switch Pro controllers (USB or Bluetooth) show up to games as standard XInput pads. PS4/PS5 controllers show up as their own device, which games with native DualShock support use; XInput-only games such as New Vegas need Steam Input or a registry switch (see docs/NOTES.md). Not yet tested with a physical controller; after `scripts/run-tests.sh`, `scripts/wine-run.sh 30 'C:\padtest.exe' 10` lists what games see and shows button presses.
 - 4 GB of address space for 32-bit games, without patching their executables (Fallout 3 and New Vegas otherwise run out at 2 GB). It applies to every 32-bit program Steam starts; if an old 32-bit game misbehaves, `WINE_LARGE_ADDRESS_AWARE=0 scripts/steam.sh` turns it off for the session.
 - MP3 and WAV audio through GStreamer, so older games' DirectShow music plays (Fallout 3, New Vegas and Oblivion play music this way; not yet tested in those games). Media Foundation goes through the same plugins but is untested, and no video decoders are built.
-- Retina rendering at 2x.
+- Games render at the size your display setting "looks like" (3008×1692 on a 4K screen scaled that way) and macOS scales them up, so they run fast. `scripts/hidpi.sh on` makes Steam's text crisper, but every game then defaults to the full pixel size (6016×3384 on that screen), where Moon Sweepers dropped from 60 fps to 22.
 - Game audio offered as 5.1 and mixed down to stereo, so center-channel dialog isn't lost; audio follows the macOS output device (headphones connected mid-game get the sound).
 
 ## What doesn't
@@ -38,7 +38,7 @@ scripts/build-all.sh
 scripts/install-steam.sh
 ```
 
-`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, GStreamer, SDL2, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `scripts/run-tests.sh` builds small test programs and checks each piece (DirectX 9/11/12, Vulkan, audio, MP3 playback, 4 GB for 32-bit games, the controller layer); `--steam` also runs some of them with Steam's own environment and checks that Steam's sign-in window is drawn, while `--build-only` just compiles them (no Wine needed). `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and sets Retina scaling.
+`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, GStreamer, SDL2, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `scripts/run-tests.sh` builds small test programs and checks each piece (DirectX 9/11/12, Vulkan, audio, MP3 playback, 4 GB for 32-bit games, the controller layer); `--steam` also runs some of them with Steam's own environment and checks that Steam's sign-in window is drawn, while `--build-only` just compiles them (no Wine needed). `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and leaves Retina mode off (see `scripts/hidpi.sh`).
 
 ## Play
 

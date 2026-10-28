@@ -23,6 +23,11 @@ done
 re='^[A-Za-z0-9][A-Za-z0-9 ._-]*$'
 [[ $NAME =~ $re ]] || { echo "app name can only use letters, digits, spaces, . _ -: $NAME" >&2; exit 2; }
 [ -f "$ICON" ] || { echo "icon not found: $ICON" >&2; exit 2; }
+DEST="$HOME/Applications/$NAME.app"
+if [ $INSTALL = 1 ] && [ -e "$DEST" ] && [ ! -f "$DEST/Contents/Resources/root.txt" ]; then
+    echo "$DEST exists and wasn't built by this script; not replacing it" >&2
+    exit 2
+fi
 
 B="$ROOT/build/app"
 APP="$B/$NAME.app"
@@ -77,8 +82,8 @@ echo "built $APP"
 
 if [ $INSTALL = 1 ]; then
     mkdir -p "$HOME/Applications"
-    rm -rf "$HOME/Applications/$NAME.app"
-    ditto "$APP" "$HOME/Applications/$NAME.app"
+    rm -rf "$DEST"
+    ditto "$APP" "$DEST"
     rm -rf "$APP"   # one copy only, so Spotlight and the Dock don't show two
     echo "installed $HOME/Applications/$NAME.app"
 fi

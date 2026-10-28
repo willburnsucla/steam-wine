@@ -29,6 +29,16 @@ export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-mscoree,mshtml=;winemenubuilder.exe
 export DXMT_LOG_PATH="${DXMT_LOG_PATH:-Z:${ROOT//\//\\}\\logs\\dxmt\\}"
 mkdir -p "$ROOT/logs/dxmt"
 
+# Our Wine's processes, one "pid command line" per line. Only processes using our ntdll count:
+# CrossOver or another Wine may be running a Steam of its own.
+NTDLL="$ROOT/dist/lib/wine/x86_64-unix/ntdll.so"
+our_procs() {
+    local pids
+    pids=$(lsof -t "$NTDLL" 2>/dev/null | paste -sd, -)
+    [ -z "$pids" ] || ps -o pid=,args= -p "$pids"
+}
+has() { grep -iF "$2" <<<"$1" >/dev/null; }   # Steam shows as steam.exe or Steam.exe
+
 if [ "${1:-}" = "--stop" ]; then
     exec "$ROOT/dist/bin/wineserver" -k
 fi
@@ -48,6 +58,21 @@ if [ "${1:-}" = "--exec" ]; then
     exec "$ROOT/dist/bin/wine" "$@"
 fi
 
+# Steam already running in our Wine: hand over to it, which brings its window forward. Not in its
+# first 45 s, though: until Steam is ready to take a hand-over, a second steam.exe starts a whole
+# second Steam, and the two stall each other (a second click on the app while Steam starts).
+steam_pid=$(our_procs | grep -iF 'C:\Program Files (x86)\Steam\steam.exe' | awk 'NR == 1 {print $1}' || true)
+if [ -n "$steam_pid" ]; then
+    age=$(ps -o etime= -p "$steam_pid" | awk -F'[-:]' '{
+        if (NF == 2) print $1 * 60 + $2; else if (NF == 3) print $1 * 3600 + $2 * 60 + $3
+        else print $1 * 86400 + $2 * 3600 + $3 * 60 + $4 }')
+    if [ "${age:-0}" -lt 45 ]; then
+        echo "Steam is still starting; not starting it again"
+        exit 0
+    fi
+    exec "$ROOT/dist/bin/wine" 'C:\Program Files (x86)\Steam\steam.exe' -cef-disable-gpu -noverifyfiles "$@"
+fi
+
 # Steam's web helper draws its UI from a separate GPU process into a window owned by another
 # process. Wine's macOS driver can't do cross-process window drawing (cf. Wine bug 56014), so
 # the window stays black. Our wrapper (tools/webhelper-wrapper.c) starts the real helper with
@@ -60,9 +85,6 @@ CEF="$WINEPREFIX/drive_c/Program Files (x86)/Steam/bin/cef/cef.win64"
 build_webhelper_wrapper
 install_webhelper_wrapper "$CEF"
 
-# Is a process whose command line contains $1 running? (grep -v grep: grep's own command
-# line contains the pattern.)
-running() { ps -axo args | grep -v grep | grep -qiF "$1"; }   # Steam shows as steam.exe or Steam.exe
 
 # A Steam client update replaces the helper mid-launch, after the check above, so the restarted
 # Steam would run it unwrapped (black window). While Steam runs, re-wrap a replaced helper and
@@ -70,9 +92,10 @@ running() { ps -axo args | grep -v grep | grep -qiF "$1"; }   # Steam shows as s
 watch_webhelper() {
     # This runs in a background subshell; a grep with no match must not end it.
     set +e +o pipefail
-    local seen=0 strikes=0 pids
+    local seen=0 strikes=0 procs pids
     while sleep 2; do
-        if running 'C:\Program Files (x86)\Steam\steam.exe'; then
+        procs=$(our_procs)
+        if has "$procs" 'C:\Program Files (x86)\Steam\steam.exe'; then
             seen=1
         elif [ $seen = 1 ]; then
             break   # Steam has exited
@@ -83,8 +106,8 @@ watch_webhelper() {
         # Unwrapped = helper processes running but none of them is steamwebhelper_real.exe.
         # Require it on two checks in a row, so a wrapper that is still starting its real
         # helper isn't mistaken for an unwrapped one.
-        pids=$(ps -axo pid,args | grep -F 'cef.win64\steamwebhelper.exe' | grep -v grep | awk '{print $1}')
-        if [ -n "$pids" ] && ! running 'cef.win64\steamwebhelper_real.exe'; then
+        pids=$(grep -F 'cef.win64\steamwebhelper.exe' <<<"$procs" | awk '{print $1}')
+        if [ -n "$pids" ] && ! has "$procs" 'cef.win64\steamwebhelper_real.exe'; then
             strikes=$((strikes + 1))
             [ $strikes -ge 2 ] && { kill $pids 2>/dev/null; strikes=0; }
         else
