@@ -38,7 +38,7 @@ scripts/build-all.sh
 scripts/install-steam.sh
 ```
 
-`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, GStreamer, SDL2, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `scripts/run-tests.sh` builds small test programs and checks each piece (DirectX 9/11/12, Vulkan, audio, MP3 playback, 4 GB for 32-bit games, the controller layer); `--steam` also runs some of them with Steam's own environment and checks that Steam's sign-in window is drawn. `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and sets Retina scaling.
+`build-all.sh` fetches every source at a pinned version (`fetch-sources.sh` checks the downloads against SHA-256 sums), then builds the x86_64 libraries, GStreamer, SDL2, MoltenVK, Wine, LLVM 15 and DXMT, and DXVK. `scripts/run-tests.sh` builds small test programs and checks each piece (DirectX 9/11/12, Vulkan, audio, MP3 playback, 4 GB for 32-bit games, the controller layer); `--steam` also runs some of them with Steam's own environment and checks that Steam's sign-in window is drawn, while `--build-only` just compiles them (no Wine needed). `install-steam.sh` creates the Windows environment in `prefixes/steam`, installs Steam from Valve's CDN, turns on DXMT and sets Retina scaling.
 
 ## Play
 
@@ -49,6 +49,12 @@ Open OpenRunner (`scripts/build-app.sh --install` builds it and puts it in your 
 - `scripts/steam.sh --exec <program>` runs a Windows program (an installer, a mod manager) inside Steam's environment with the same settings. Start Steam first if the program launches a game, so the game's Steam session gets Steam's fixes.
 - `scripts/game-graphics.sh <path to the game's exe> dxvk` switches one game to DXVK; `dxmt` switches it back.
 - `WINE_COREAUDIO_FORCE_5_1=0 scripts/steam.sh` turns off the 5.1 downmix, and `WINE_COREAUDIO_FOLLOW_DEFAULT=0` keeps game audio on the device that was selected when the game started.
+
+## Updating
+
+Every pinned version, checksum and commit lives in `scripts/versions.sh`. When CodeWeavers publishes a new CrossOver source release, `scripts/update-crossover.sh <version>` downloads it and applies this project's Wine and GLib patches to a scratch copy; it names any patch that no longer applies, and leaves the scratch copy in `build/crossover-check/` for rebasing it. `--apply` pins the new version, keeps the old sources as `src/sources-<old version>` and unpacks the new ones, after which `scripts/build-all.sh` rebuilds everything. CodeWeavers doesn't publish checksums, so a new version's SHA-256 comes from the download itself.
+
+On every push, GitHub Actions (`.github/workflows/check.yml`) runs shellcheck over the scripts, builds the test programs and the Mac app, and checks that the patches still apply to the pinned CrossOver release. A full Wine build takes too long for CI, so `scripts/run-tests.sh` on a built checkout is still the real test.
 
 ## How it works
 

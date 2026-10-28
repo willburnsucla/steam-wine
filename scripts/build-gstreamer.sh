@@ -6,7 +6,6 @@
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 
-MPG123_VERSION=1.33.7
 CROSS="$BUILD/x86_64-darwin.ini"
 
 # Meson cross file: x86_64 code from the arm64 side. Rosetta runs the x86_64 test programs, so

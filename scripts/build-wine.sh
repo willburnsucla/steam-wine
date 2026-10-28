@@ -11,7 +11,8 @@ WINE_SRC="$SRC/wine"
 # natively from either side, and target x86_64. configure runs its x86_64 test programs
 # through Rosetta, so this is a normal (non-cross) build.
 TC=/Library/Developer/CommandLineTools/usr/bin
-export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+export SDKROOT
 export CC="$TC/clang -arch x86_64" CXX="$TC/clang++ -arch x86_64"
 export AR="$TC/ar" RANLIB="$TC/ranlib" STRIP="$TC/strip" NM="$TC/nm"
 X86=""
@@ -23,7 +24,8 @@ apply_patches() {
         if patch -d "$WINE_SRC" -p1 -R -s -f --dry-run < "$p" >/dev/null 2>&1; then
             echo "already applied: $(basename "$p")"
         else
-            patch -d "$WINE_SRC" -p1 -s < "$p" && echo "applied: $(basename "$p")"
+            patch -d "$WINE_SRC" -p1 -s < "$p" || { echo "patch failed: $p" >&2; return 1; }
+            echo "applied: $(basename "$p")"
         fi
     done
 }

@@ -5,9 +5,8 @@ set -euo pipefail
 source "$(dirname "$0")/env.sh"
 unset CC CXX CFLAGS CXXFLAGS LDFLAGS   # CMake picks the architecture itself
 
-SDL_VERSION=2.32.10
-s="$ROOT/src/SDL2-$SDL_VERSION"
-[ -d "$s" ] || tar -xzf "$ROOT/downloads/SDL2-$SDL_VERSION.tar.gz" -C "$ROOT/src"
+s="$ROOT/src/SDL2-$SDL2_VERSION"
+[ -d "$s" ] || tar -xzf "$ROOT/downloads/SDL2-$SDL2_VERSION.tar.gz" -C "$ROOT/src"
 rm -rf "$BUILD/sdl2"
 cmake -S "$s" -B "$BUILD/sdl2" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 \

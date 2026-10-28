@@ -50,18 +50,11 @@ fi
 # --in-process-gpu so the compositor lives in the process that owns the window.
 # Steam's bootstrapper restores the original helper when file sizes don't match, hence
 # -noverifyfiles. If Steam updated the helper, the new one becomes steamwebhelper_real.exe.
-install_webhelper_wrapper() {
-    local cef="$WINEPREFIX/drive_c/Program Files (x86)/Steam/bin/cef/cef.win64"
-    local wrapper="$ROOT/tools/steamwebhelper-wrapper.exe"
-    [ -f "$wrapper" ] || x86_64-w64-mingw32-gcc -O2 -municode -mwindows \
-        -o "$wrapper" "$ROOT/tools/webhelper-wrapper.c"
-    [ -f "$cef/steamwebhelper.exe" ] || return 0
-    if ! cmp -s "$cef/steamwebhelper.exe" "$wrapper"; then
-        mv "$cef/steamwebhelper.exe" "$cef/steamwebhelper_real.exe"
-        cp "$wrapper" "$cef/steamwebhelper.exe"
-    fi
-}
-install_webhelper_wrapper
+# The build and install steps are in scripts/webhelper.sh.
+source "$ROOT/scripts/webhelper.sh"
+CEF="$WINEPREFIX/drive_c/Program Files (x86)/Steam/bin/cef/cef.win64"
+build_webhelper_wrapper
+install_webhelper_wrapper "$CEF"
 
 # Is a process whose command line contains $1 running? (grep -v grep: grep's own command
 # line contains the pattern.)
@@ -73,16 +66,14 @@ running() { ps -axo args | grep -v grep | grep -qiF "$1"; }   # Steam shows as s
 watch_webhelper() {
     # This runs in a background subshell; a grep with no match must not end it.
     set +e +o pipefail
-    local cef="$WINEPREFIX/drive_c/Program Files (x86)/Steam/bin/cef/cef.win64"
-    local wrapper="$ROOT/tools/steamwebhelper-wrapper.exe" seen=0 strikes=0 pids
+    local seen=0 strikes=0 pids
     while sleep 2; do
         if running 'C:\Program Files (x86)\Steam\steam.exe'; then
             seen=1
         elif [ $seen = 1 ]; then
             break   # Steam has exited
         fi
-        [ -f "$cef/steamwebhelper.exe" ] || continue
-        cmp -s "$cef/steamwebhelper.exe" "$wrapper" || install_webhelper_wrapper
+        install_webhelper_wrapper "$CEF"
         # Unwrapped = helper processes running but none of them is steamwebhelper_real.exe.
         # Require it on two checks in a row, so a wrapper that is still starting its real
         # helper isn't mistaken for an unwrapped one.

@@ -1,21 +1,28 @@
 #!/bin/bash
 # Build the test programs in tools/ and run them in prefixes/test with time limits.
-# Usage: scripts/run-tests.sh [--steam]
-#   --steam also checks that Steam's sign-in window is drawn (scripts/check-login-visual.sh).
+# Usage: scripts/run-tests.sh [--steam | --build-only]
+#   --steam       also runs two tests with Steam's environment and checks that Steam's sign-in
+#                 window is drawn (scripts/check-login-visual.sh)
+#   --build-only  only compile the test programs (needs mingw-w64, not Wine; used by CI)
 # Prints one line per test and exits with the number of failures.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MODE=${1:-}
+case $MODE in
+    ""|--steam|--build-only) ;;
+    *) echo "usage: $0 [--steam | --build-only]" >&2; exit 2 ;;
+esac
 export WINEPREFIX="$ROOT/prefixes/test" WINEDEBUG=-all
 C="$WINEPREFIX/drive_c"
 T="$ROOT/tools"
-mkdir -p "$C/dxvktest"
+[ "$MODE" = --build-only ] || mkdir -p "$C/dxvktest"
 
 fails=0
 build() { # compiler out.exe source.c [libs...]   (a failed build counts as a failure)
     local cc=$1 out=$2 src=$3; shift 3
     rm -f "$T/$out" "$C/$out"
     if "$cc" -O2 -o "$T/$out" "$T/$src" "$@"; then
-        cp "$T/$out" "$C/"
+        [ "$MODE" = --build-only ] || cp "$T/$out" "$C/"
     else
         printf 'FAIL  build %s\n' "$out"; fails=$((fails + 1))
     fi
@@ -30,6 +37,49 @@ build x86_64-w64-mingw32-gcc mp3test.exe mp3test.c -lole32 -lstrmiids -luuid
 build i686-w64-mingw32-gcc mp3test32.exe mp3test.c -lole32 -lstrmiids -luuid
 build i686-w64-mingw32-gcc memtest32.exe memtest.c -Wl,--disable-large-address-aware
 build x86_64-w64-mingw32-gcc padtest.exe padtest.c -ldinput8 -ldxguid -lxinput -lole32
+build x86_64-w64-mingw32-gcc winlist.exe winlist.c -lgdi32 -luser32
+
+# Installing Steam's web helper wrapper (scripts/webhelper.sh) into a fake cef folder. The real
+# helper must never be lost, whatever is installed when steam.sh starts. Uses its own copy of the
+# wrapper, so the one steam.sh installs isn't touched.
+(
+    WEBHELPER_WRAPPER="$T/webhelper-wrapper-test.exe"
+    . "$ROOT/scripts/webhelper.sh"
+    rm -f "$WEBHELPER_WRAPPER"
+    build_webhelper_wrapper || exit 1
+    W="$WEBHELPER_WRAPPER" D="$ROOT/build/webhelper-test" bad=0
+    older="$D-older.exe"   # an older build of the wrapper: same code, other bytes
+    cp "$W" "$older"; printf 'X' | dd of="$older" bs=1 seek=136 conv=notrunc 2>/dev/null
+    case_() { # label installed-helper installed-real(or -) expected-real
+        rm -rf "$D"; mkdir -p "$D"
+        cp "$2" "$D/steamwebhelper.exe"
+        [ "$3" = - ] || cp "$3" "$D/steamwebhelper_real.exe"
+        install_webhelper_wrapper "$D"
+        if cmp -s "$D/steamwebhelper.exe" "$W" && cmp -s "$D/steamwebhelper_real.exe" "$4"; then
+            printf 'PASS  web helper wrapper: %s\n' "$1"
+        else
+            printf 'FAIL  web helper wrapper: %s\n' "$1"; bad=$((bad + 1))
+        fi
+    }
+    echo "real helper v1" > "$D-real1.exe"; echo "real helper v2" > "$D-real2.exe"
+    case_ "first install keeps Steam's helper" "$D-real1.exe" - "$D-real1.exe"
+    case_ "older wrapper build is replaced, real helper kept" "$older" "$D-real1.exe" "$D-real1.exe"
+    case_ "Steam update becomes the real helper" "$D-real2.exe" "$D-real1.exe" "$D-real2.exe"
+    case_ "already installed is left alone" "$W" "$D-real1.exe" "$D-real1.exe"
+    build_webhelper_wrapper
+    cp "$W" "$D-first.exe"; rm -f "$W"; sleep 1; build_webhelper_wrapper   # 1 s: a new link time
+    if cmp -s "$W" "$D-first.exe"; then printf 'PASS  web helper wrapper: rebuild is byte-identical\n'
+    else printf 'FAIL  web helper wrapper: rebuild is byte-identical\n'; bad=$((bad + 1)); fi
+    rm -rf "$D" "$D-older.exe" "$D-real1.exe" "$D-real2.exe" "$D-first.exe"
+    exit $bad
+)
+fails=$((fails + $?))
+
+if [ "$MODE" = --build-only ]; then
+    [ $fails = 0 ] && printf 'PASS  build all programs in tools/\n'
+    echo "$fails failure(s)"
+    exit "$fails"
+fi
 cp "$T/d3d11test.exe" "$ROOT/dist/dxvk/x64/d3d11.dll" "$ROOT/dist/dxvk/x64/dxgi.dll" "$C/dxvktest/"
 python3 -I "$T/make-silent-mp3.py" "$C/silence.mp3" 3 > /dev/null
 
@@ -83,7 +133,7 @@ else
 fi
 "$ROOT/dist/bin/wineserver" -k 2>/dev/null
 
-if [ "${1:-}" = "--steam" ]; then
+if [ "$MODE" = --steam ]; then
     # The same programs with exactly the environment Steam gives games (steam.sh --exec).
     S="$ROOT/prefixes/steam/drive_c"
     cp "$C/memtest32.exe" "$C/mp3test32.exe" "$C/silence.mp3" "$S/"
