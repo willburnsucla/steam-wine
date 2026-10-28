@@ -74,8 +74,8 @@ check "4 GB for 32-bit games" "WINE_LARGE_ADDRESS_AWARE=1" -- 'C:\memtest32.exe'
 # "main loop started" alone isn't proof (a bus that failed to init logs it too), so also require
 # that neither SDL failure message appears.
 out=$(WINEDEBUG='+hid' "$ROOT/scripts/wine-run.sh" 60 'C:\padtest.exe' 1 2>&1)
-if grep -q 'L"SDL" main loop started' <<<"$out" && ! grep -q 'SDL support not compiled in' <<<"$out" \
-    && ! grep -q 'L"SDL" bus init returned' <<<"$out"; then
+if grep -q 'L"SDL" main loop started' <<<"$out" \
+    && ! grep -qE 'SDL support not compiled in|L"SDL" bus (init|wait) returned|Unhandled (exception|page fault)' <<<"$out"; then
     printf 'PASS  Controller support (SDL bus started)\n'
 else
     printf 'FAIL  Controller support (SDL bus started)\n'; fails=$((fails + 1))

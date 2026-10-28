@@ -60,9 +60,10 @@ CrossOver's Steam profile adds fonts, the VC++ runtime, `d3dcompiler_47` and msy
 
 ## Controllers
 
-- Wine's `winebus.sys` reads controllers through SDL2 (built by `build-sdl.sh`, 2.32.10, x86_64; Wine loads `libSDL2-2.0.0.dylib` through the `deps/lib` rpath). Without it, winebus logs `SDL support not compiled in!` and games see no gamepads. CodeWeavers' winebus also turns on PS4/PS5 rumble over Bluetooth.
+- Wine's `winebus.sys` reads controllers through SDL2 (built by `build-sdl.sh`, 2.32.10, x86_64; Wine loads `libSDL2-2.0.0.dylib` through the `deps/lib` rpath). Without it, winebus logs `SDL support not compiled in!` and Xbox/Switch-style pads don't reach XInput. SDL2 has its IOKit, GameController.framework and HIDAPI backends compiled in.
+- winebus picks one route per controller (`is_hidraw_enabled` in `main.c`): Xbox, Switch and generic pads go through SDL and become XInput devices; PS4/PS5 pads prefer the raw HID route, which games with native DualShock support use but XInput-only games don't see. To send PS pads through SDL instead (XInput), set `DisableHidraw` = dword 1 under `HKLM\System\CurrentControlSet\Services\WineBus` in the Steam prefix (`scripts/steam.sh --exec reg add 'HKLM\System\CurrentControlSet\Services\WineBus' /v DisableHidraw /t REG_DWORD /d 1 /f`), or per device with a `Hidraw` = 0 value under that key's `Devices` subkey. CodeWeavers' winebus also turns on PS4/PS5 rumble over Bluetooth.
 - `run-tests.sh` checks that winebus logs `L"SDL" main loop started` with neither SDL failure message (a bus that failed to init also logs "main loop started", so that line alone proves nothing). The XBOX bus is disabled by Wine on macOS 15+ and UDEV/IOHID are other backends; SDL is the one that maps gamepads.
-- `tools/padtest.c` lists XInput and DirectInput controllers and prints button state; it needs a physical controller to pass.
+- `tools/padtest.c` polls for the whole run (Wine adds a controller a moment after its bus starts), prints each controller once, then button state: XInput pads through XInput, DirectInput-only pads through DirectInput. It needs a physical controller to pass. For a first live test, an Xbox or Switch Pro controller exercises the SDL-to-XInput path New Vegas uses.
 
 ## Audio
 
