@@ -12,6 +12,7 @@
 #  - 4 GB of address space for 32-bit games (Fallout 3/New Vegas run out at 2 GB), without
 #    patching their exes. WINE_LARGE_ADDRESS_AWARE=0 turns it off.
 # Usage: scripts/steam.sh [extra steam args]   (Ctrl-C or `scripts/steam.sh --stop` to quit)
+#        scripts/steam.sh --wait   wait until Steam and everything else Wine runs has exited
 #        scripts/steam.sh --exec <program> [args]   run a program in Steam's prefix with Steam's
 #            environment (installers, mod managers, tests). Start Steam first if the program
 #            launches a game. EXEC_TIME_LIMIT=<seconds> is for tests: when it's hit, everything
@@ -30,6 +31,9 @@ mkdir -p "$ROOT/logs/dxmt"
 
 if [ "${1:-}" = "--stop" ]; then
     exec "$ROOT/dist/bin/wineserver" -k
+fi
+if [ "${1:-}" = "--wait" ]; then
+    exec "$ROOT/dist/bin/wineserver" -w
 fi
 
 if [ "${1:-}" = "--exec" ]; then
@@ -72,6 +76,8 @@ watch_webhelper() {
             seen=1
         elif [ $seen = 1 ]; then
             break   # Steam has exited
+        elif ! kill -0 $$ 2>/dev/null; then
+            break   # Steam never started: the wine this script became ($$) is already gone
         fi
         install_webhelper_wrapper "$CEF"
         # Unwrapped = helper processes running but none of them is steamwebhelper_real.exe.

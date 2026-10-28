@@ -7,8 +7,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check:
+    # Pull requests from this repo's own branches are already checked by their push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +23,8 @@ jobs:
 
       - name: Shell scripts
         run: |
-          for f in scripts/*.sh; do bash -n "$f"; done
+          # macOS's own bash (3.2), which is what runs these scripts
+          for f in scripts/*.sh; do /bin/bash -n "$f"; done
           shellcheck -S warning scripts/*.sh
 
       - name: Test programs and web helper wrapper
@@ -27,13 +33,18 @@ jobs:
       - name: Mac app
         run: scripts/build-app.sh
 
+      - name: Pinned CrossOver version
+        id: crossover
+        run: |
+          . scripts/versions.sh
+          echo "version=$CROSSOVER_VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha256=$CROSSOVER_SHA256" >> "$GITHUB_OUTPUT"
+
       - name: Cache CrossOver sources
         uses: actions/cache@v4
         with:
-          path: downloads
-          key: crossover-${{ hashFiles('scripts/versions.sh') }}
+          path: downloads/crossover-sources-${{ steps.crossover.outputs.version }}.tar.gz
+          key: crossover-${{ steps.crossover.outputs.sha256 }}
 
       - name: Patches apply to the pinned CrossOver
-        run: |
-          . scripts/versions.sh
-          scripts/update-crossover.sh "$CROSSOVER_VERSION"
+        run: scripts/update-crossover.sh "${{ steps.crossover.outputs.version }}"

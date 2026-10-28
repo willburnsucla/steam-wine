@@ -10,7 +10,8 @@
  * The real helper is put in a job object that is killed when the wrapper exits, so Steam
  * terminating the wrapper also ends the helper.
  *
- * Build: x86_64-w64-mingw32-gcc -O2 -municode -mwindows -o steamwebhelper.exe webhelper-wrapper.c
+ * Build: scripts/webhelper.sh (x86_64-w64-mingw32-gcc -O2 -municode -mwindows
+ *        -Wl,--no-insert-timestamp), run by steam.sh.
  */
 #include <windows.h>
 #include <wchar.h>

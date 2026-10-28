@@ -42,9 +42,11 @@ scripts/install-steam.sh
 
 ## Play
 
-Open OpenRunner (`scripts/build-app.sh --install` builds it and puts it in your Applications folder), or run `scripts/steam.sh` from a terminal. Sign in, install a game, play. Quitting OpenRunner quits Steam and everything Wine started. Steam updates itself on the first launch (about 250 MB), and a game's first run is slow while shaders compile.
+Open OpenRunner (`scripts/build-app.sh --install` builds it and moves it into your Applications folder), or run `scripts/steam.sh` from a terminal (`Steam (Wine).command` does the same from Finder). Sign in, install a game, play. Steam updates itself on the first launch (about 250 MB), and a game's first run is slow while shaders compile.
 
-- `scripts/build-app.sh --name <name> --icon <image>` rebuilds the app with another name or icon (any square image macOS can read; the default is `art/openrunner-icon.svg`). Rebuild it if you move the project folder.
+OpenRunner stays open as long as anything runs in Steam's Wine, including while Steam restarts itself after an update, and closes once you exit Steam. Quitting OpenRunner quits Steam and everything Wine started; clicking its Dock icon brings Steam's window forward. Its log is `logs/openrunner.log`.
+
+- `scripts/build-app.sh --name <name> --icon <image>` rebuilds the app with another name or icon (any image macOS can read, fitted to a square; the default is `art/openrunner-icon.svg`). Without `--install` the app stays in `build/app/`. Rebuild it if you move the project folder. The app is signed only on this Mac, so each rebuild makes macOS forget the permissions you gave it, such as the microphone for voice chat.
 - `scripts/steam.sh --stop` quits Steam and everything Wine started.
 - `scripts/steam.sh --exec <program>` runs a Windows program (an installer, a mod manager) inside Steam's environment with the same settings. Start Steam first if the program launches a game, so the game's Steam session gets Steam's fixes.
 - `scripts/game-graphics.sh <path to the game's exe> dxvk` switches one game to DXVK; `dxmt` switches it back.
@@ -52,7 +54,7 @@ Open OpenRunner (`scripts/build-app.sh --install` builds it and puts it in your 
 
 ## Updating
 
-Every pinned version, checksum and commit lives in `scripts/versions.sh`. When CodeWeavers publishes a new CrossOver source release, `scripts/update-crossover.sh <version>` downloads it and applies this project's Wine and GLib patches to a scratch copy; it names any patch that no longer applies, and leaves the scratch copy in `build/crossover-check/` for rebasing it. `--apply` pins the new version, keeps the old sources as `src/sources-<old version>` and unpacks the new ones, after which `scripts/build-all.sh` rebuilds everything. CodeWeavers doesn't publish checksums, so a new version's SHA-256 comes from the download itself.
+Every pinned version, checksum and commit lives in `scripts/versions.sh`. When CodeWeavers publishes a new CrossOver source release, `scripts/update-crossover.sh <version>` downloads it and applies this project's Wine and GLib patches to a scratch copy; it names any patch that no longer applies, and leaves the scratch copy in `build/crossover-check.noindex/` so you can look at the rejects. `--apply` pins the new version, keeps the old sources as `src/sources-<old version>` and unpacks the new ones, after which `scripts/build-all.sh` rebuilds everything. CodeWeavers doesn't publish checksums, so a new version's SHA-256 comes from the download itself.
 
 On every push, GitHub Actions (`.github/workflows/check.yml`) runs shellcheck over the scripts, builds the test programs and the Mac app, and checks that the patches still apply to the pinned CrossOver release. A full Wine build takes too long for CI, so `scripts/run-tests.sh` on a built checkout is still the real test.
 

@@ -18,9 +18,12 @@ T="$ROOT/tools"
 [ "$MODE" = --build-only ] || mkdir -p "$C/dxvktest"
 
 fails=0
+built=" "
 build() { # compiler out.exe source.c [libs...]   (a failed build counts as a failure)
     local cc=$1 out=$2 src=$3; shift 3
-    rm -f "$T/$out" "$C/$out"
+    built="$built$src "
+    rm -f "$T/$out"
+    [ "$MODE" = --build-only ] || rm -f "$C/$out"
     if "$cc" -O2 -o "$T/$out" "$T/$src" "$@"; then
         [ "$MODE" = --build-only ] || cp "$T/$out" "$C/"
     else
@@ -38,39 +41,67 @@ build i686-w64-mingw32-gcc mp3test32.exe mp3test.c -lole32 -lstrmiids -luuid
 build i686-w64-mingw32-gcc memtest32.exe memtest.c -Wl,--disable-large-address-aware
 build x86_64-w64-mingw32-gcc padtest.exe padtest.c -ldinput8 -ldxguid -lxinput -lole32
 build x86_64-w64-mingw32-gcc winlist.exe winlist.c -lgdi32 -luser32
+built="${built}webhelper-wrapper.c "   # built by webhelper.sh below
+# A new program in tools/ has to be added above, or CI would never compile it.
+for f in "$T"/*.c; do
+    case $built in *" $(basename "$f") "*) ;;
+        *) printf 'FAIL  %s is not built by run-tests.sh\n' "${f#"$ROOT"/}"; fails=$((fails + 1)) ;;
+    esac
+done
 
 # Installing Steam's web helper wrapper (scripts/webhelper.sh) into a fake cef folder. The real
-# helper must never be lost, whatever is installed when steam.sh starts. Uses its own copy of the
-# wrapper, so the one steam.sh installs isn't touched.
+# helper must never be lost, whatever is installed when steam.sh starts, and however many
+# steam.sh instances install at once. Uses its own copy of the wrapper, so the one steam.sh
+# installs isn't touched.
 (
     WEBHELPER_WRAPPER="$T/webhelper-wrapper-test.exe"
     . "$ROOT/scripts/webhelper.sh"
     rm -f "$WEBHELPER_WRAPPER"
     build_webhelper_wrapper || exit 1
-    W="$WEBHELPER_WRAPPER" D="$ROOT/build/webhelper-test" bad=0
-    older="$D-older.exe"   # an older build of the wrapper: same code, other bytes
+    W="$WEBHELPER_WRAPPER" bad=0
+    X=$(mktemp -d) || exit 1
+    D="$X/cef"
+    older="$X/older.exe"   # an older build of the wrapper: same code, other bytes
     cp "$W" "$older"; printf 'X' | dd of="$older" bs=1 seek=136 conv=notrunc 2>/dev/null
-    case_() { # label installed-helper installed-real(or -) expected-real
-        rm -rf "$D"; mkdir -p "$D"
-        cp "$2" "$D/steamwebhelper.exe"
-        [ "$3" = - ] || cp "$3" "$D/steamwebhelper_real.exe"
-        install_webhelper_wrapper "$D"
-        if cmp -s "$D/steamwebhelper.exe" "$W" && cmp -s "$D/steamwebhelper_real.exe" "$4"; then
-            printf 'PASS  web helper wrapper: %s\n' "$1"
-        else
-            printf 'FAIL  web helper wrapper: %s\n' "$1"; bad=$((bad + 1))
-        fi
+    echo "real helper v1" > "$X/real1.exe"; echo "real helper v2" > "$X/real2.exe"
+    report() { # label ok?
+        if [ "$2" = 0 ]; then printf 'PASS  web helper wrapper: %s\n' "$1"
+        else printf 'FAIL  web helper wrapper: %s\n' "$1"; bad=$((bad + 1)); fi
     }
-    echo "real helper v1" > "$D-real1.exe"; echo "real helper v2" > "$D-real2.exe"
-    case_ "first install keeps Steam's helper" "$D-real1.exe" - "$D-real1.exe"
-    case_ "older wrapper build is replaced, real helper kept" "$older" "$D-real1.exe" "$D-real1.exe"
-    case_ "Steam update becomes the real helper" "$D-real2.exe" "$D-real1.exe" "$D-real2.exe"
-    case_ "already installed is left alone" "$W" "$D-real1.exe" "$D-real1.exe"
+    setup() { # installed-helper (or -) installed-real (or -)
+        rm -rf "$D"; mkdir -p "$D"
+        [ "$1" = - ] || cp "$1" "$D/steamwebhelper.exe"
+        [ "$2" = - ] || cp "$2" "$D/steamwebhelper_real.exe"
+    }
+    installed() { # expected-real: wrapper in place and the real helper as expected?
+        cmp -s "$D/steamwebhelper.exe" "$W" && cmp -s "$D/steamwebhelper_real.exe" "$1"
+    }
+    case_() { # label installed-helper installed-real expected-real
+        setup "$2" "$3"
+        install_webhelper_wrapper "$D"
+        installed "$4"; report "$1" $?
+    }
+    case_ "first install keeps Steam's helper" "$X/real1.exe" - "$X/real1.exe"
+    case_ "older wrapper build is replaced, real helper kept" "$older" "$X/real1.exe" "$X/real1.exe"
+    case_ "Steam update becomes the real helper" "$X/real2.exe" "$X/real1.exe" "$X/real2.exe"
+    case_ "already installed is left alone" "$W" "$X/real1.exe" "$X/real1.exe"
+    case_ "interrupted install is finished" - "$X/real1.exe" "$X/real1.exe"
+    # Two installs at once (two steam.sh watchers) right after a Steam update, 30 times. Helpers
+    # the size of Steam's (7.5 MB) make the race window as wide as it really is. Each install is
+    # retried as the watcher would, 2 s later.
+    head -c 7500000 /dev/urandom > "$X/big1.exe"; head -c 7500000 /dev/urandom > "$X/big2.exe"
+    lost=0
+    for _ in $(seq 1 30); do
+        setup "$X/big2.exe" "$X/big1.exe"
+        install_webhelper_wrapper "$D" & install_webhelper_wrapper "$D" & wait
+        install_webhelper_wrapper "$D"; install_webhelper_wrapper "$D"
+        installed "$X/big2.exe" || lost=$((lost + 1))
+    done
+    report "two installs at once keep the real helper ($lost of 30 lost)" $lost
     build_webhelper_wrapper
-    cp "$W" "$D-first.exe"; rm -f "$W"; sleep 1; build_webhelper_wrapper   # 1 s: a new link time
-    if cmp -s "$W" "$D-first.exe"; then printf 'PASS  web helper wrapper: rebuild is byte-identical\n'
-    else printf 'FAIL  web helper wrapper: rebuild is byte-identical\n'; bad=$((bad + 1)); fi
-    rm -rf "$D" "$D-older.exe" "$D-real1.exe" "$D-real2.exe" "$D-first.exe"
+    cp "$W" "$X/first.exe"; rm -f "$W"; sleep 1; build_webhelper_wrapper   # 1 s: a new link time
+    cmp -s "$W" "$X/first.exe"; report "rebuild is byte-identical" $?
+    rm -rf "$X" "$W" "$W.lock"
     exit $bad
 )
 fails=$((fails + $?))

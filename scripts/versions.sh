@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2034  # variables are used by the scripts that source this file
 # Every pinned source in one place: versions, SHA-256 sums and git commits.
-# Sourced by fetch-sources.sh, build-gstreamer.sh, build-sdl.sh and update-crossover.sh.
+# Sourced by env.sh (so every build script), fetch-sources.sh and update-crossover.sh.
 # scripts/update-crossover.sh --apply rewrites the two CROSSOVER_ lines.
 
 CROSSOVER_VERSION=26.3.0
@@ -23,6 +23,9 @@ DXVK_MACOS_COMMIT=8f1e28deed3ad30802f7e1bdff428ec14e6e7817
 LIBFFI_COMMIT=83d0cfd00d7d37af4b4349511d29f1f0512621b3
 PROXY_LIBINTL_COMMIT=c03e1a74b17fa7ec467e110130775409e4828a4c
 GVDB_COMMIT=0854af0fdb6d527a8d1999835ac2c5059976c210
+# What GLib's wraps ask for; update-crossover.sh fails when a new tarball asks for something else.
+LIBFFI_WRAP_REVISION=meson
+PROXY_LIBINTL_WRAP_REVISION=0.4
 PCRE2_VERSION=10.42      # must match GLib's subprojects/pcre2.wrap
 PCRE2_WRAP=10.42-2
 PCRE2_SHA256=8d36cd8cb6ea2a4c2bb358ff6411b0c788633a2a45dabbf1aeb4b701d1b5e840

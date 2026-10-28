@@ -1,4 +1,5 @@
-// Render an SVG (or any image macOS can read) to a square PNG.
+// Render an SVG (or any image macOS can read) to a square PNG. A non-square image is scaled to
+// fit and centered, not stretched.
 // Usage: render-icon <in.svg> <out.png> <size>
 import AppKit
 
@@ -14,7 +15,9 @@ rep.size = NSSize(width: size, height: size)
 NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 NSGraphicsContext.current?.imageInterpolation = .high
-image.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
+let s = CGFloat(size), w = image.size.width, h = image.size.height
+let scale = min(s / w, s / h)
+image.draw(in: NSRect(x: (s - w * scale) / 2, y: (s - h * scale) / 2, width: w * scale, height: h * scale))
 NSGraphicsContext.restoreGraphicsState()
 guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }
 try png.write(to: URL(fileURLWithPath: args[2]))
