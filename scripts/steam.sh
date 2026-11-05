@@ -11,7 +11,9 @@
 #    WINE_COREAUDIO_FORCE_5_1=0 turns it off.
 #  - 4 GB of address space for 32-bit games (Fallout 3/New Vegas run out at 2 GB), without
 #    patching their exes. WINE_LARGE_ADDRESS_AWARE=0 turns it off.
-# Usage: scripts/steam.sh [extra steam args]   (Ctrl-C or `scripts/steam.sh --stop` to quit)
+# Usage: scripts/steam.sh [extra steam args]
+#        scripts/steam.sh --quit   ask Steam to exit (up to 15 s), then stop everything Wine runs
+#        scripts/steam.sh --stop   stop Steam and everything Wine runs, at once
 #        scripts/steam.sh --wait   wait until Steam and everything else Wine runs has exited
 #        scripts/steam.sh --exec <program> [args]   run a program in Steam's prefix with Steam's
 #            environment (installers, mod managers, tests). Start Steam first if the program
@@ -34,7 +36,7 @@ mkdir -p "$ROOT/logs/dxmt"
 NTDLL="$ROOT/dist/lib/wine/x86_64-unix/ntdll.so"
 our_procs() {
     local pids
-    pids=$(lsof -t "$NTDLL" 2>/dev/null | paste -sd, -)
+    pids=$(lsof -t "$NTDLL" 2>/dev/null | paste -sd, - || true)
     [ -z "$pids" ] || ps -o pid=,args= -p "$pids"
 }
 has() { grep -iF "$2" <<<"$1" >/dev/null; }   # Steam shows as steam.exe or Steam.exe
@@ -44,6 +46,23 @@ if [ "${1:-}" = "--stop" ]; then
 fi
 if [ "${1:-}" = "--wait" ]; then
     exec "$ROOT/dist/bin/wineserver" -w
+fi
+if [ "${1:-}" = "--quit" ]; then
+    # Steam exits cleanly on -shutdown (Steam Cloud syncs, settings are saved); a game still running
+    # is then stopped with everything else. Only ask a running Steam: -shutdown would start one.
+    if has "$(our_procs)" 'C:\Program Files (x86)\Steam\steam.exe'; then
+        "$ROOT/dist/bin/wine" 'C:\Program Files (x86)\Steam\steam.exe' -shutdown >/dev/null 2>&1 &
+        for _ in $(seq 1 15); do
+            sleep 1
+            has "$(our_procs)" 'C:\Program Files (x86)\Steam\steam.exe' || break
+        done
+    fi
+    exec "$ROOT/dist/bin/wineserver" -k
+fi
+
+if [ ! -f "$WINEPREFIX/drive_c/Program Files (x86)/Steam/steam.exe" ]; then
+    echo "Steam isn't installed in $WINEPREFIX yet; run scripts/install-steam.sh first" >&2
+    exit 1
 fi
 
 if [ "${1:-}" = "--exec" ]; then

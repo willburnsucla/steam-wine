@@ -111,6 +111,12 @@ if [ "$MODE" = --build-only ]; then
     echo "$fails failure(s)"
     exit "$fails"
 fi
+# A fresh checkout has no test prefix yet: create it and turn DXMT on, as install-steam.sh does for
+# Steam's. An existing one is left alone, so the DXMT check below still means something.
+if [ ! -d "$C/windows/system32" ]; then
+    "$ROOT/scripts/wine-run.sh" 120 wineboot -i > /dev/null 2>&1
+    "$ROOT/scripts/install-dxmt.sh" on "$WINEPREFIX" > /dev/null
+fi
 cp "$T/d3d11test.exe" "$ROOT/dist/dxvk/x64/d3d11.dll" "$ROOT/dist/dxvk/x64/dxgi.dll" "$C/dxvktest/"
 python3 -I "$T/make-silent-mp3.py" "$C/silence.mp3" 3 > /dev/null
 

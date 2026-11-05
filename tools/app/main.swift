@@ -32,11 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let fd = open(logPath, O_WRONLY | O_CREAT | O_APPEND, 0o644)
         guard fd >= 0 else { return }
         log = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
-        log?.write("\n=== OpenRunner started \(Date()) ===\n".data(using: .utf8)!)
+        try? log?.write(contentsOf: "\n=== OpenRunner started \(Date()) ===\n".data(using: .utf8)!)
     }
 
     private func note(_ text: String) {
-        log?.write("OpenRunner: \(text)\n".data(using: .utf8)!)
+        // try?: a log that can't be written (a full disk) must not take the app down with it.
+        try? log?.write(contentsOf: "OpenRunner: \(text)\n".data(using: .utf8)!)
     }
 
     private func runScript(_ args: [String]) -> Process {
@@ -80,8 +81,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !root.isEmpty, FileManager.default.fileExists(atPath: "\(root)/scripts/steam.sh") else {
             alert("OpenRunner can't find its project folder",
                   "It was built for \(root.isEmpty ? "an unknown folder" : root), which no longer has "
-                  + "scripts/steam.sh. If you moved the project, run scripts/build-app.sh --install "
-                  + "from its new location.")
+                  + "scripts/steam.sh. If you moved the project, run scripts/build-all.sh and then "
+                  + "scripts/build-app.sh --install from its new location.")
             NSApp.terminate(nil)
             return
         }
@@ -132,24 +133,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         note("quitting")
         quitting = true
         guard let launch = launch else { return .terminateNow }
-        // Stop Steam and everything Wine started. steam.sh may not have started Wine yet when
-        // Quit comes right after opening, so keep stopping until steam.sh has exited, then wait
-        // for Wine's server to go away. Give up after 15 s.
+        // Ask Steam to exit on its own (so Steam Cloud syncs), then stop everything Wine still runs.
+        // steam.sh may not have started Wine yet when Quit comes right after opening, so keep
+        // stopping until steam.sh has exited. Then wait for Wine's server to go, stopping again if
+        // something (a Steam that was restarting itself) brought it back. Give up after 30 s.
         DispatchQueue.global().async {
-            let deadline = Date().addingTimeInterval(15)
-            repeat {
+            let deadline = Date().addingTimeInterval(30)
+            self.runAndWait(["--quit"])
+            while launch.isRunning && Date() < deadline {
                 self.runAndWait(["--stop"])
-                if !launch.isRunning { break }
                 usleep(500_000)
-            } while Date() < deadline
+            }
             if launch.isRunning {
                 kill(launch.processIdentifier, SIGKILL)
                 self.runAndWait(["--stop"])
             }
-            let w = self.runScript(["--wait"])
-            if (try? w.run()) != nil {
-                while w.isRunning && Date() < deadline { usleep(200_000) }
-                if w.isRunning { w.terminate() }
+            while Date() < deadline {
+                let w = self.runScript(["--wait"])
+                guard (try? w.run()) != nil else { break }
+                let until = Date().addingTimeInterval(3)
+                while w.isRunning && Date() < until { usleep(100_000) }
+                if !w.isRunning { break }
+                w.terminate()
+                self.runAndWait(["--stop"])
             }
             self.note("stopped")
             DispatchQueue.main.async { NSApp.reply(toApplicationShouldTerminate: true) }

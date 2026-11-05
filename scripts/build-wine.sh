@@ -52,8 +52,17 @@ build_wine() {
     cd "$BUILD/wine" && $X86 make -j$JOBS
 }
 
+# make install puts Wine's own d3d11/dxgi/d3d10core/d3d12 back over DXMT's. If DXMT was on, turn it
+# back on for every prefix, or D3D10/11/12 games would quietly fall back to wined3d.
 install_wine() {
+    local dxmt p
+    dxmt=$("$ROOT/scripts/install-dxmt.sh" status 2>/dev/null || echo off)
     cd "$BUILD/wine" && $X86 make install
+    if [ "$dxmt" = on ]; then
+        for p in "$ROOT"/prefixes/*/; do
+            if [ -d "$p/drive_c" ]; then "$ROOT/scripts/install-dxmt.sh" on "${p%/}"; fi
+        done
+    fi
 }
 
 targets=("$@")

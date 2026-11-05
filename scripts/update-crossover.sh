@@ -116,9 +116,10 @@ if [ $APPLY = 0 ]; then
 fi
 finish() { echo "pinned CrossOver $V, but fetch-sources.sh failed; run it again to finish" >&2; exit 2; }
 if [ "$V" = "$CROSSOVER_VERSION" ]; then
-    # Already pinned. An earlier --apply may have stopped before fetching GLib's subprojects.
-    [ -d "$ROOT/src/sources/wine" ] || "$ROOT/scripts/fetch-sources.sh" || finish
-    echo "already pinned to $V"
+    # Already pinned. Fetch anyway (it skips what's there): an earlier --apply may have stopped
+    # before GLib's subprojects were fetched.
+    "$ROOT/scripts/fetch-sources.sh" || finish
+    echo "already pinned to $V, and every source is fetched"
     exit 0
 fi
 

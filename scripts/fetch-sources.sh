@@ -12,8 +12,16 @@ mkdir -p "$ROOT/downloads" "$ROOT/src"
 fetch() { # url file sha256 [dir]   (dir defaults to downloads/)
     local out="${4:-$ROOT/downloads}/$2"
     mkdir -p "$(dirname "$out")"
-    [ -f "$out" ] || curl -fL --retry 3 -o "$out" "$1"
-    echo "$3  $out" | shasum -a 256 -c -
+    # Download under a temporary name, so an interrupted download is never taken for a finished one.
+    if [ ! -f "$out" ]; then
+        curl -fL --retry 3 -o "$out.part" "$1"
+        mv "$out.part" "$out"
+    fi
+    if ! echo "$3  $out" | shasum -a 256 -c -; then
+        mv "$out" "$out.bad"
+        echo "checksum mismatch: moved to $out.bad; run again to download it afresh" >&2
+        exit 1
+    fi
 }
 
 clone() { # url dir ref   (dir relative to src/)
@@ -50,6 +58,6 @@ fetch "https://wrapdb.mesonbuild.com/v2/pcre2_$PCRE2_WRAP/get_patch" \
 
 clone https://github.com/3Shain/dxmt.git dxmt "$DXMT_COMMIT"
 git -C "$ROOT/src/dxmt" submodule update -q --init --depth 1
-clone https://github.com/llvm/llvm-project.git llvm-project "$LLVM_TAG"
-clone https://github.com/KhronosGroup/MoltenVK.git moltenvk-upstream "$MOLTENVK_TAG"
+clone https://github.com/llvm/llvm-project.git llvm-project "$LLVM_COMMIT"
+clone https://github.com/KhronosGroup/MoltenVK.git moltenvk-upstream "$MOLTENVK_COMMIT"
 clone https://github.com/Gcenx/DXVK-macOS.git dxvk-macos "$DXVK_MACOS_COMMIT"

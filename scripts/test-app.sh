@@ -71,6 +71,8 @@ sleep 8
 check "reopen keeps a single app" '[ "$(pgrep -x "$NAME" | wc -l | tr -d " ")" = 1 ]'
 check "reopen keeps a single Steam" '[ "$(steam_count)" = 1 ]'
 quit_and_check "normal"
+check "normal: Steam shut down cleanly (Steam Cloud synced)" \
+    'awk -v s="[$since]" "substr(\$0,1,21) >= s" "$L/bootstrap_log.txt" | grep -q Shutdown'
 stop_all
 
 # 2. Steam already running.

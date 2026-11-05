@@ -16,7 +16,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install tools
         run: brew install shellcheck mingw-w64
@@ -41,10 +41,12 @@ jobs:
           echo "sha256=$CROSSOVER_SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Cache CrossOver sources
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: downloads/crossover-sources-${{ steps.crossover.outputs.version }}.tar.gz
           key: crossover-${{ steps.crossover.outputs.sha256 }}
 
       - name: Patches apply to the pinned CrossOver
-        run: scripts/update-crossover.sh "${{ steps.crossover.outputs.version }}"
+        env:
+          CROSSOVER_VERSION: ${{ steps.crossover.outputs.version }}
+        run: scripts/update-crossover.sh "$CROSSOVER_VERSION"
