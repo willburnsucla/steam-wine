@@ -11,3 +11,6 @@ logs/
 shots/
 tools/*.exe
 *.dxvk-cache
+plans/
+*.app
+art/concepts/

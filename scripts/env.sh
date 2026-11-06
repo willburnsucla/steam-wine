@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2034  # variables are used by the scripts that source this file
 # Shared build environment. Source this from the other scripts.
 # Host libraries are x86_64 (Wine's macOS host side runs under Rosetta);
 # we cross-compile them from the arm64 side so configure never runs x86_64 code.
@@ -7,6 +9,7 @@ SRC="$ROOT/src/sources"
 BUILD="$ROOT/build"
 DEPS="$ROOT/deps"          # x86_64 host libraries
 WINE_PREFIX_DIR="$ROOT/dist" # installed Wine
+. "$ROOT/scripts/versions.sh"
 
 export MACOSX_DEPLOYMENT_TARGET=13.0
 export CC="clang -arch x86_64"

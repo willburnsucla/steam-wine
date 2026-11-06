@@ -1,0 +1,52 @@
+# Quick checks that run on GitHub's macOS runners. A full Wine build takes too long for CI, so
+# this covers the scripts, the test programs, the Mac app and whether our patches still apply to
+# the pinned CrossOver sources. scripts/run-tests.sh on a built checkout is the real test.
+name: check
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # Pull requests from this repo's own branches are already checked by their push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install tools
+        run: brew install shellcheck mingw-w64
+
+      - name: Shell scripts
+        run: |
+          # macOS's own bash (3.2), which is what runs these scripts
+          for f in scripts/*.sh; do /bin/bash -n "$f"; done
+          shellcheck -S warning scripts/*.sh
+
+      - name: Test programs and web helper wrapper
+        run: scripts/run-tests.sh --build-only
+
+      - name: Mac app
+        run: scripts/build-app.sh
+
+      - name: Pinned CrossOver version
+        id: crossover
+        run: |
+          . scripts/versions.sh
+          echo "version=$CROSSOVER_VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha256=$CROSSOVER_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Cache CrossOver sources
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: downloads/crossover-sources-${{ steps.crossover.outputs.version }}.tar.gz
+          key: crossover-${{ steps.crossover.outputs.sha256 }}
+
+      - name: Patches apply to the pinned CrossOver
+        env:
+          CROSSOVER_VERSION: ${{ steps.crossover.outputs.version }}
+        run: scripts/update-crossover.sh "$CROSSOVER_VERSION"

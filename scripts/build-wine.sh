@@ -11,7 +11,8 @@ WINE_SRC="$SRC/wine"
 # natively from either side, and target x86_64. configure runs its x86_64 test programs
 # through Rosetta, so this is a normal (non-cross) build.
 TC=/Library/Developer/CommandLineTools/usr/bin
-export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+export SDKROOT
 export CC="$TC/clang -arch x86_64" CXX="$TC/clang++ -arch x86_64"
 export AR="$TC/ar" RANLIB="$TC/ranlib" STRIP="$TC/strip" NM="$TC/nm"
 X86=""
@@ -23,7 +24,8 @@ apply_patches() {
         if patch -d "$WINE_SRC" -p1 -R -s -f --dry-run < "$p" >/dev/null 2>&1; then
             echo "already applied: $(basename "$p")"
         else
-            patch -d "$WINE_SRC" -p1 -s < "$p" && echo "applied: $(basename "$p")"
+            patch -d "$WINE_SRC" -p1 -s < "$p" || { echo "patch failed: $p" >&2; return 1; }
+            echo "applied: $(basename "$p")"
         fi
     done
 }
@@ -36,11 +38,11 @@ configure_wine() {
         --prefix="$WINE_PREFIX_DIR" \
         --enable-archs=i386,x86_64 \
         --with-mingw \
-        --with-coreaudio --with-cups --with-vulkan --with-freetype --with-gnutls --with-opencl \
+        --with-coreaudio --with-cups --with-gstreamer --with-sdl --with-vulkan --with-freetype --with-gnutls --with-opencl \
         --without-alsa --without-capi --without-dbus --without-ffmpeg --without-fontconfig \
         --without-gettext --without-gettextpo --without-gphoto --without-gssapi \
-        --without-gstreamer --without-inotify --without-krb5 --without-netapi --without-oss \
-        --without-pcap --without-pcsclite --without-pulse --without-sane --without-sdl \
+        --without-inotify --without-krb5 --without-netapi --without-oss \
+        --without-pcap --without-pcsclite --without-pulse --without-sane \
         --without-udev --without-usb --without-v4l2 --without-wayland --without-x \
         --disable-tests
 }
@@ -50,8 +52,17 @@ build_wine() {
     cd "$BUILD/wine" && $X86 make -j$JOBS
 }
 
+# make install puts Wine's own d3d11/dxgi/d3d10core/d3d12 back over DXMT's. If DXMT was on, turn it
+# back on for every prefix, or D3D10/11/12 games would quietly fall back to wined3d.
 install_wine() {
+    local dxmt p
+    dxmt=$("$ROOT/scripts/install-dxmt.sh" status 2>/dev/null || echo off)
     cd "$BUILD/wine" && $X86 make install
+    if [ "$dxmt" = on ]; then
+        for p in "$ROOT"/prefixes/*/; do
+            if [ -d "$p/drive_c" ]; then "$ROOT/scripts/install-dxmt.sh" on "${p%/}"; fi
+        done
+    fi
 }
 
 targets=("$@")

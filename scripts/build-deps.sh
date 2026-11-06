@@ -4,7 +4,7 @@
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 
-cross=(--host=$HOST_TRIPLE --build=$BUILD_TRIPLE --prefix="$DEPS")
+cross=("--host=$HOST_TRIPLE" "--build=$BUILD_TRIPLE" "--prefix=$DEPS")
 
 build_gmp() {
     rm -rf "$BUILD/gmp" && mkdir -p "$BUILD/gmp" && cd "$BUILD/gmp"
@@ -14,9 +14,9 @@ build_gmp() {
 
 build_nettle() {
     # CrossOver's tarball ships nettle without its top-level Makefile.in, so use the
-    # official GNU release (downloads/nettle-3.10.tar.gz, signature verified).
-    local n="$ROOT/src/nettle-3.10"
-    [ -d "$n" ] || tar -xzf "$ROOT/downloads/nettle-3.10.tar.gz" -C "$ROOT/src"
+    # official GNU release (downloads/nettle-$NETTLE_VERSION.tar.gz, checksum pinned).
+    local n="$ROOT/src/nettle-$NETTLE_VERSION"
+    [ -d "$n" ] || tar -xzf "$ROOT/downloads/nettle-$NETTLE_VERSION.tar.gz" -C "$ROOT/src"
     rm -rf "$BUILD/nettle" && mkdir -p "$BUILD/nettle" && cd "$BUILD/nettle"
     "$n/configure" "${cross[@]}" --enable-shared --disable-static \
         --disable-openssl --disable-documentation

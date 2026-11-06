@@ -20,7 +20,7 @@ since=$(date '+%Y-%m-%d %H:%M:%S')
 (WINE_MACDRV_DUMP_DIR="$D" "$ROOT/scripts/steam.sh" "$@" > "$D/steam.log" 2>&1 &)
 login=no
 for i in $(seq 1 60); do
-    if awk -v s="[$since]" 'substr($0,1,21) >= s' "$L/webhelper.txt" | grep -q 'DesktopLoginWindow.*WasHidden 0'; then
+    if awk -v s="[$since]" 'substr($0,1,21) >= s' "$L/webhelper.txt" | grep -qE '(DesktopLoginWindow|SP Desktop_uid[0-9]+)[^:]*: WasHidden 0'; then
         login="yes (${i}s)"; break
     fi
     sleep 1
@@ -31,7 +31,7 @@ procs=$(ps -axo args | grep -F 'Steam\bin\cef' | grep -v grep |
 wrapper=$([ "$(stat -f %z "$C/steamwebhelper.exe")" -lt 1000000 ] && echo kept || echo RESTORED-BY-STEAM)
 "$ROOT/scripts/steam.sh" --stop >/dev/null 2>&1; sleep 3
 
-# The login window is the largest dumped surface.
+# Steam's window (sign-in, or main when Steam signs in by itself) is the largest dumped surface.
 big=$(ls -S "$D"/*.bmp 2>/dev/null | head -1)
 pct=n/a
 if [ -n "$big" ]; then

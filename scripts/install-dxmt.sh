@@ -1,12 +1,12 @@
 #!/bin/bash
 # Switch our Wine between DXMT (D3D11/10 -> Metal) and Wine's own wined3d.
-# Usage: scripts/install-dxmt.sh on|off [prefix]
+# Usage: scripts/install-dxmt.sh on|off|status [prefix]   (status prints on or off)
 # Follows DXMT's install guide for builds with -Dwine_builtin_dll=true:
 # winemetal.so -> lib/wine/x86_64-unix; d3d11/dxgi/d3d10core/winemetal.dll -> lib/wine/*-windows,
 # winemetal.dll also into the prefix's system32 (and syswow64 for 32-bit).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MODE=${1:?on|off}
+MODE=${1:?on|off|status}
 PREFIX=${2:-$ROOT/prefixes/steam}
 LIB="$ROOT/dist/lib/wine"
 DX="$ROOT/dist/dxmt"
@@ -14,15 +14,24 @@ BACKUP="$LIB/wined3d-originals"
 DLLS="d3d11 dxgi d3d10core"
 D3D12=d3d12   # 64-bit only, and only if DXMT was built with enable_d3d12
 
+# Is DXMT what Wine has installed? DXMT's d3d11 imports winemetal.dll and Wine's doesn't. The
+# DLLs are always switched as a set, so d3d11 speaks for all of them.
+dxmt_installed() { LC_ALL=C grep -qa 'winemetal.dll' "$LIB/x86_64-windows/d3d11.dll"; }
+
 case $MODE in
+status)
+    if dxmt_installed; then echo on; else echo off; fi
+    ;;
 on)
-    for arch in x86_64-windows i386-windows; do
-        mkdir -p "$BACKUP/$arch"
-        for d in $DLLS; do
-            [ -e "$BACKUP/$arch/$d.dll" ] || cp -p "$LIB/$arch/$d.dll" "$BACKUP/$arch/$d.dll"
+    # Back up Wine's own DLLs whenever they're what's installed: the first time, and again after a
+    # Wine rebuild has put new ones back (an old backup would restore the previous build's).
+    if ! dxmt_installed; then
+        for arch in x86_64-windows i386-windows; do
+            mkdir -p "$BACKUP/$arch"
+            for d in $DLLS; do cp -p "$LIB/$arch/$d.dll" "$BACKUP/$arch/$d.dll"; done
         done
-    done
-    [ -e "$BACKUP/x86_64-windows/$D3D12.dll" ] || cp -p "$LIB/x86_64-windows/$D3D12.dll" "$BACKUP/x86_64-windows/"
+        cp -p "$LIB/x86_64-windows/$D3D12.dll" "$BACKUP/x86_64-windows/"
+    fi
     cp "$DX/x86_64-unix/winemetal.so" "$LIB/x86_64-unix/"
     for d in $DLLS winemetal; do
         cp "$DX/x86_64-windows/$d.dll" "$LIB/x86_64-windows/"
@@ -56,5 +65,5 @@ off)
     rm -f "$LIB/x86_64-unix/winemetal.so" "$LIB/x86_64-windows/winemetal.dll" "$LIB/i386-windows/winemetal.dll"
     echo "DXMT off (wined3d)"
     ;;
-*) echo "usage: $0 on|off [prefix]"; exit 1 ;;
+*) echo "usage: $0 on|off|status [prefix]"; exit 1 ;;
 esac

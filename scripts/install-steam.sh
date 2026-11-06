@@ -18,5 +18,5 @@ mkdir -p "$ROOT/downloads" "$(dirname "$WINEPREFIX")"
 "$ROOT/dist/bin/wineserver" -k || true
 
 "$ROOT/scripts/install-dxmt.sh" on "$WINEPREFIX"
-"$ROOT/scripts/hidpi.sh" on "$WINEPREFIX"
+"$ROOT/scripts/hidpi.sh" off "$WINEPREFIX"   # games at the size macOS shows; see hidpi.sh
 echo "Steam installed in $WINEPREFIX. Start it with scripts/steam.sh"
